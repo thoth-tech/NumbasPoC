@@ -1,55 +1,52 @@
 require 'grape'
 require 'zip'
 
-require 'fileutils'
-require 'mime-types'
-
 class NumbasAPI < Grape::API
   format :json
 
-  helpers do
-    # Helper function to extract a ZIP file to the specified destination
-    def extract_zip(file, destination)
-      Zip::File.open(file) do |zip_file|
-        zip_file.each do |entry|
-          entry.extract(File.join(destination, entry.name))
-        end
+  # Define the API namespace
+  namespace :numbas_api do
+    # Route for serving the index.html file from the ZIP archive
+    get do
+      # Set the path to the ZIP archive
+      zip_path = File.join('public', 'assets', 'numbas1.zip')
+
+      # Get an input stream for the index.html file within the ZIP archive
+      index_html_stream = Zip::File.open(zip_path) do |zip_file|
+        zip_file.get_input_stream('index.html')
+      end
+
+      # Set the content type for the response
+      content_type 'text/html'
+
+      # Stream the contents of the index.html file to the client
+      stream do |out|
+        out.write(index_html_stream.read(4096)) until index_html_stream.eof?
+        index_html_stream.close
       end
     end
-  end
 
-  # Define the API namespace
-  namespace :zip do
-    # Route for serving the index.html file
-    get 'index.html' do
-      # Set the location of the ZIP file and the destination to extract it
-      zip_path = 'public/numbas.zip'
-      extracted_folder = 'public/extracted/numbas'
+    # Route for serving files from the ZIP archive
+    get '*file_path' do
+      # Set the path to the ZIP archive
+      zip_path = File.join('public', 'assets', 'numbas1.zip')
 
-      # Create the destination folder if it doesn't exist
-      FileUtils.mkdir_p(extracted_folder)
+      # Set the path to the requested file within the ZIP archive
+      file_path = params[:file_path]
 
-      # Extract the ZIP file
-      extract_zip(zip_path, extracted_folder)
-
-      # Redirect to the index.html file within the extracted folder
-      redirect '/extracted/numbas/index.html'
-    end
-
-    # Route for serving any other file within the extracted folder
-    get '*path' do
-      # Set the file path within the extracted folder
-      file_path = "public/extracted/numbas/#{params[:path]}"
-
-      # Return an error if the file doesn't exist
-      error!('File not found', 404) unless File.exist?(file_path)
+      # Get an input stream for the requested file within the ZIP archive
+      file_stream = Zip::File.open(zip_path) do |zip_file|
+        zip_file.get_input_stream(file_path)
+      end
 
       # Set the content type based on the file extension
-      content_type = MIME::Types.type_for(file_path).first.content_type
-      header 'Content-Type', content_type
+      content_type MIME::Types.type_for(file_path).first.content_type
 
-      # Serve the file
-      File.read(file_path)
+      # Stream the contents of the file to the client
+      stream do |out|
+        out.write(file_stream.read(4096)) until file_stream.eof?
+        file_stream.close
+      end
     end
   end
 end
