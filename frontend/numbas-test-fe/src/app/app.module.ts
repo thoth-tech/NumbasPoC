@@ -4,9 +4,11 @@ import { HttpClientModule } from '@angular/common/http';
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
+import { NumbasComponent } from './components/numbas-component/numbas-component.component';
+
 
 @NgModule({
-  declarations: [AppComponent],
+  declarations: [AppComponent, NumbasComponent],
   imports: [BrowserModule, AppRoutingModule, HttpClientModule], 
   providers: [],
   bootstrap: [AppComponent],
