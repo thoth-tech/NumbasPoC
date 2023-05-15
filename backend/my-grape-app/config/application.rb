@@ -31,13 +31,19 @@ module MyGrapeApp
     # config.time_zone = "Central Time (US & Canada)"
     # config.eager_load_paths << Rails.root.join("extras")
 
+# config/initializers/cors.rb
 
-    config.middleware.insert_before 0, Rack::Cors do
-      allow do
-        origins '*'
-        resource '*', headers: :any, methods: [:get, :post, :put, :patch, :delete]
-      end
-    end
+Rails.application.config.middleware.insert_before 0, Rack::Cors do
+  allow do
+    origins 'http://localhost:4200'
+
+    resource '/api/numbas_api/*',
+      headers: :any,
+      methods: [:get, :post, :put, :patch, :delete, :options],
+      credentials: true
+  end
+end
+
     
 
     # Only loads a smaller set of middleware suitable for API only apps.
