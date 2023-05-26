@@ -1,6 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 import { NumbasService } from '../../services/numbas.service';
 
+declare global {
+  interface Window { API: any; }
+}
+
 @Component({
   selector: 'app-numbas',
   templateUrl: './numbas-component.component.html'
@@ -14,12 +18,19 @@ export class NumbasComponent implements OnInit {
 
   launchNumbasTest(): void {
     const iframe = document.createElement('iframe');
-    iframe.src = 'http://localhost:3000/api/numbas_api/index.html';
+    iframe.src = 'http://localhost:4200/api/numbas_api/index.html';
     iframe.style.width = '100%';
     iframe.style.height = '800px';
     document.body.appendChild(iframe);
+
+    window.API = {
+      LMSInitialize: () => { console.log('API.init()'); return true; },
+      LMSGetLastError: () => { console.log('API.LMSGetLastError()'); return 0; },
+      LMSGetErrorString: (errorCode: string) => { console.log('API.LMSGetErrorString()', errorCode); return errorCode; },
+      LMSGetValue: (element: string) => { console.log('API.LMSGetValue()', element); return ""; },
+    }
   }
-  
+
 
   interceptIframeRequests(): void {
     const originalOpen = XMLHttpRequest.prototype.open;
@@ -43,5 +54,5 @@ export class NumbasComponent implements OnInit {
       }
     };
   }
-  
+
 }

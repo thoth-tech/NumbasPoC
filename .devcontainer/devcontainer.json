@@ -1,0 +1,86 @@
+//devcontainer.json
+{
+  "name": "Numbas Test Dev Container",
+  // "image": "numbastest-devcontainer",
+  // "runArgs": ["--env-file",".devcontainer/devcontainer.env"],
+
+  "dockerFile": "../dev.Dockerfile",
+  // "dockerComposeFile": "../development/docker-compose.yml",
+  // "service": "formatif-dev-container",
+  // "shutdownAction": "stopCompose",
+  // "workspaceFolder": "/workspace",
+
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh"
+      },
+
+      "extensions": [
+		"dbaeumer.vscode-eslint",
+		"EditorConfig.EditorConfig",
+		"ms-vsliveshare.vsliveshare",
+		"ms-vsliveshare.vsliveshare-pack",
+		"rebornix.ruby",
+		"misogi.ruby-rubocop",
+		"castwide.solargraph",
+		"wingrunr21.vscode-ruby",
+		"vscode-icons-team.vscode-icons",
+		"cschlosser.doxdocgen",
+		"eamodio.gitlens",
+		"GitHub.vscode-pull-request-github",
+		"GitHub.copilot",
+		"Angular.ng-template",
+		"johnpapa.Angular2",
+		"ms-azuretools.vscode-docker",
+		"esbenp.prettier-vscode",
+		"foxundermoon.shell-format",
+		"cyrilletuzi.angular-schematics",
+		"bradlc.vscode-tailwindcss"
+	]
+    }
+  },
+
+  "mounts": [
+    // {
+    //   "source": "${localWorkspaceFolder}/data/database",
+    //   "target": "/var/lib/mysql",
+    //   "type": "bind"
+    // },
+    // {
+    //   "source": "${localWorkspaceFolder}/data/tmp",
+    //   "target": "/workspace/tmp",
+    //   "type": "bind"
+    // },
+    // {
+    //   "source": "${localWorkspaceFolder}/data/student-work",
+    //   "target": "/student-work",
+    //   "type": "bind"
+    // },
+    // {
+    //   "source": "ws_node_modules",
+    //   "target": "/workspace/node_modules",
+    //   "type": "volume"
+    // },
+    // {
+    //   "source": "web_node_modules",
+    //   "target": "/workspace/doubtfire-web/node_modules",
+    //   "type": "volume"
+    // },
+    // {
+    //   "source": "api_bundle",
+    //   "target": "/home/vscode/.gems",
+    //   "type": "volume"
+    // }
+  ],
+
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+  "workspaceFolder": "/workspace",
+
+  "forwardPorts": [3000,4200,9876],
+
+  "postCreateCommand": "/workspace/.devcontainer/post_create.sh",
+  "postStartCommand": "/workspace/.devcontainer/post_start.sh",
+
+  "overrideCommand": true
+}
