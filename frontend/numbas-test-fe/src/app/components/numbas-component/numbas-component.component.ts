@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { NumbasService } from '../../services/numbas.service';
+import jsPDF from 'jspdf';
 
 declare global {
   interface Window { API: any; }
@@ -29,34 +30,53 @@ export class NumbasComponent implements OnInit {
       LMSInitialize: () => { console.log('API.init()'); return "true"; },
       LMSFinish: () => {
         console.log('API.LMSFinish()');
-        let examResult = {...this.dataStore};
+        let examResult = JSON.parse(this.dataStore['cmi.suspend_data']);
 
-        // Create a Blob from the JSON data
-        const examResultBlob = new Blob([JSON.stringify(examResult, null, 2)], {type: 'application/json'});
-
-        // Create a URL for the Blob
-        const blobURL = window.URL.createObjectURL(examResultBlob);
-
-        // Create a link element
-        const tempLink = document.createElement('a');
-
-        // Set the link's href to the Blob URL
-        tempLink.href = blobURL;
-
-        // Set the download attribute of the link to the desired file name
-        tempLink.download = 'examResult.json';
-
-        // Append the link to the body
-        document.body.appendChild(tempLink);
-
-        // Programmatically click the link
-        tempLink.click();
-
-        // Remove the link from the body
-        document.body.removeChild(tempLink);
-
-        return "true";
+        // Create a new jsPDF instance
+        const doc = new jsPDF();
+      
+        // Set the document's title
+        doc.setFontSize(18);
+        doc.text('Advanced Number Theory Exam Results', 10, 20);
+      
+        // Extract the exam details
+        const examName = examResult['examName'];
+        const sessionId = examResult['sessionId'];
+        const examStart = examResult['examStart'];
+        const examStop = examResult['examStop'];
+        const timeSpent = examResult['timeSpent'];
+      
+        // Display the overall score and maximum possible score
+        const totalScore = parseInt(this.dataStore['cmi.score.raw']);
+        const maxScore = parseInt(this.dataStore['cmi.score.max']);
+        const scorePercentage = ((totalScore / maxScore) * 100).toFixed(2);
+        const overallScoreText = `Overall score: ${totalScore} / ${maxScore} (${scorePercentage}%)`;
+        doc.setFontSize(12);
+        doc.text(overallScoreText, 10, 30);
+      
+        // Display the completion status
+        const completionStatus = this.dataStore['cmi.completion_status'];
+        doc.text(`Completion status: ${completionStatus}`, 10, 40);
+      
+        // Display the time spent on the exam
+        doc.text(`Time spent: ${timeSpent}`, 10, 50);
+      
+        // Extract the individual question scores
+        const questionScores = examResult['questionScores'];
+        let y = 60;
+        for (const questionScore of questionScores) {
+          const questionNumber = questionScore.questionNumber;
+          const score = questionScore.score;
+          const maxScore = questionScore.maxScore;
+          const questionText = `Question ${questionNumber}: ${score} / ${maxScore}`;
+          doc.text(questionText, 10, y);
+          y += 10;
+        }
+      
+        // Save the PDF
+        doc.save('exam_results.pdf');
       },
+      
       LMSGetValue: (element: string) => { 
         console.log('API.LMSGetValue()', element);
         let result = "";
