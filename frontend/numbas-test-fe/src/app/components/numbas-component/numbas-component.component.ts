@@ -10,6 +10,8 @@ declare global {
   templateUrl: './numbas-component.component.html'
 })
 export class NumbasComponent implements OnInit {
+  dataStore: { [key: string]: string } = {};
+
   constructor(private numbasService: NumbasService) {}
 
   ngOnInit(): void {
@@ -24,13 +26,85 @@ export class NumbasComponent implements OnInit {
     document.body.appendChild(iframe);
 
     window.API = {
-      LMSInitialize: () => { console.log('API.init()'); return true; },
-      LMSGetLastError: () => { console.log('API.LMSGetLastError()'); return 0; },
-      LMSGetErrorString: (errorCode: string) => { console.log('API.LMSGetErrorString()', errorCode); return errorCode; },
-      LMSGetValue: (element: string) => { console.log('API.LMSGetValue()', element); return ""; },
+      LMSInitialize: () => { console.log('API.init()'); return "true"; },
+      LMSFinish: () => {
+        console.log('API.LMSFinish()');
+        let examResult = {...this.dataStore};
+
+        // Create a Blob from the JSON data
+        const examResultBlob = new Blob([JSON.stringify(examResult, null, 2)], {type: 'application/json'});
+
+        // Create a URL for the Blob
+        const blobURL = window.URL.createObjectURL(examResultBlob);
+
+        // Create a link element
+        const tempLink = document.createElement('a');
+
+        // Set the link's href to the Blob URL
+        tempLink.href = blobURL;
+
+        // Set the download attribute of the link to the desired file name
+        tempLink.download = 'examResult.json';
+
+        // Append the link to the body
+        document.body.appendChild(tempLink);
+
+        // Programmatically click the link
+        tempLink.click();
+
+        // Remove the link from the body
+        document.body.removeChild(tempLink);
+
+        return "true";
+      },
+      LMSGetValue: (element: string) => { 
+        console.log('API.LMSGetValue()', element);
+        let result = "";
+        switch (element) {
+          case 'cmi.core.lesson_status':
+            result = 'not attempted'; 
+            break;
+          case 'cmi.entry':
+            result = 'ab-initio'; 
+            break;
+          case 'cmi.objectives._count':
+          case 'cmi.interactions._count':
+            result = '0';
+            break;
+          case 'numbas.user_role':
+            result = 'learner'; 
+            break;
+          case 'numbas.duration_extension.amount':
+            result = '0';
+            break;
+          case 'numbas.duration_extension.units':
+            result = 'seconds'; 
+            break;
+          case 'cmi.mode':
+            result = 'normal';
+            break;
+          default:
+            result = this.dataStore[element] || "";
+        }
+        return result;
+      },
+      LMSSetValue: (element: string, value: string) => { 
+        console.log('API.LMSSetValue()', element, value);
+        this.dataStore[element] = value;
+        return "true"; 
+      },
+      LMSCommit: () => { console.log('API.LMSCommit()'); return "true"; },
+      LMSGetLastError: () => { console.log('API.LMSGetLastError()'); return "0"; },
+      LMSGetErrorString: (errorCode: string) => { 
+        console.log('API.LMSGetErrorString()', errorCode);
+        return "";
+      },
+      LMSGetDiagnostic: (errorCode: string) => { 
+        console.log('API.LMSGetDiagnostic()', errorCode);
+        return "";
+      }
     }
   }
-
 
   interceptIframeRequests(): void {
     const originalOpen = XMLHttpRequest.prototype.open;
@@ -54,5 +128,4 @@ export class NumbasComponent implements OnInit {
       }
     };
   }
-
 }

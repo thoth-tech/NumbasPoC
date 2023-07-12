@@ -32,7 +32,7 @@
             "styles": [
               "src/styles.scss"
             ],
-            "scripts": []
+            "scripts": ["src/assets/js/SCORM_API_wrapper.js"]
           },
           "configurations": {
             "production": {
@@ -97,7 +97,7 @@
             "styles": [
               "src/styles.scss"
             ],
-            "scripts": []
+            "scripts": ["src/assets/js/SCORM_API_wrapper.js"]
           }
         }
       }
