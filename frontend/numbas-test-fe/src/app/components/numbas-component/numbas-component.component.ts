@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { NumbasService } from '../../services/numbas.service';
+import { LmsService } from '../../services/Lms.service';
 import jsPDF from 'jspdf';
 
 declare global {
@@ -11,9 +12,10 @@ declare global {
   templateUrl: './numbas-component.component.html'
 })
 export class NumbasComponent implements OnInit {
-  dataStore: { [key: string]: string } = {};
-
-  constructor(private numbasService: NumbasService) {}
+  constructor(
+    private numbasService: NumbasService,
+    private lmsService: LmsService
+  ) {}
 
   ngOnInit(): void {
     this.interceptIframeRequests();
@@ -27,103 +29,15 @@ export class NumbasComponent implements OnInit {
     document.body.appendChild(iframe);
 
     window.API = {
-      LMSInitialize: () => { console.log('API.init()'); return "true"; },
-      LMSFinish: () => {
-        console.log('API.LMSFinish()');
-        let examResult = JSON.parse(this.dataStore['cmi.suspend_data']);
-
-        // Create a new jsPDF instance
-        const doc = new jsPDF();
-      
-        // Set the document's title
-        doc.setFontSize(18);
-        doc.text('Advanced Number Theory Exam Results', 10, 20);
-      
-        // Extract the exam details
-        const examName = examResult['examName'];
-        const sessionId = examResult['sessionId'];
-        const examStart = examResult['examStart'];
-        const examStop = examResult['examStop'];
-        const timeSpent = examResult['timeSpent'];
-      
-        // Display the overall score and maximum possible score
-        const totalScore = parseInt(this.dataStore['cmi.score.raw']);
-        const maxScore = parseInt(this.dataStore['cmi.score.max']);
-        const scorePercentage = ((totalScore / maxScore) * 100).toFixed(2);
-        const overallScoreText = `Overall score: ${totalScore} / ${maxScore} (${scorePercentage}%)`;
-        doc.setFontSize(12);
-        doc.text(overallScoreText, 10, 30);
-      
-        // Display the completion status
-        const completionStatus = this.dataStore['cmi.completion_status'];
-        doc.text(`Completion status: ${completionStatus}`, 10, 40);
-      
-        // Display the time spent on the exam
-        doc.text(`Time spent: ${timeSpent}`, 10, 50);
-      
-        // Extract the individual question scores
-        const questionScores = examResult['questionScores'];
-        let y = 60;
-        for (const questionScore of questionScores) {
-          const questionNumber = questionScore.questionNumber;
-          const score = questionScore.score;
-          const maxScore = questionScore.maxScore;
-          const questionText = `Question ${questionNumber}: ${score} / ${maxScore}`;
-          doc.text(questionText, 10, y);
-          y += 10;
-        }
-      
-        // Save the PDF
-        doc.save('exam_results.pdf');
-      },
-      
-      LMSGetValue: (element: string) => { 
-        console.log('API.LMSGetValue()', element);
-        let result = "";
-        switch (element) {
-          case 'cmi.core.lesson_status':
-            result = 'not attempted'; 
-            break;
-          case 'cmi.entry':
-            result = 'ab-initio'; 
-            break;
-          case 'cmi.objectives._count':
-          case 'cmi.interactions._count':
-            result = '0';
-            break;
-          case 'numbas.user_role':
-            result = 'learner'; 
-            break;
-          case 'numbas.duration_extension.amount':
-            result = '0';
-            break;
-          case 'numbas.duration_extension.units':
-            result = 'seconds'; 
-            break;
-          case 'cmi.mode':
-            result = 'normal';
-            break;
-          default:
-            result = this.dataStore[element] || "";
-        }
-        return result;
-      },
-      LMSSetValue: (element: string, value: string) => { 
-        console.log('API.LMSSetValue()', element, value);
-        this.dataStore[element] = value;
-        return "true"; 
-      },
-      LMSCommit: () => { console.log('API.LMSCommit()'); return "true"; },
-      LMSGetLastError: () => { console.log('API.LMSGetLastError()'); return "0"; },
-      LMSGetErrorString: (errorCode: string) => { 
-        console.log('API.LMSGetErrorString()', errorCode);
-        return "";
-      },
-      LMSGetDiagnostic: (errorCode: string) => { 
-        console.log('API.LMSGetDiagnostic()', errorCode);
-        return "";
-      }
-    }
+      LMSInitialize: () => { return this.lmsService.LMSInitialize(); },
+      LMSFinish: () => { return this.lmsService.LMSFinish(); },
+      LMSGetValue: (element: string) => { return this.lmsService.LMSGetValue(element); },
+      LMSSetValue: (element: string, value: string) => { return this.lmsService.LMSSetValue(element, value); },
+      LMSCommit: () => { return this.lmsService.LMSCommit(); },
+      LMSGetLastError: () => { return this.lmsService.LMSGetLastError(); },
+      LMSGetErrorString: (errorCode: string) => { return this.lmsService.LMSGetErrorString(errorCode); },
+      LMSGetDiagnostic: (errorCode: string) => { return this.lmsService.LMSGetDiagnostic(errorCode); }
+    };
   }
 
   interceptIframeRequests(): void {
