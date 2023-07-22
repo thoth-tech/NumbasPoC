@@ -4,7 +4,7 @@ import { LmsService } from '../../services/Lms.service';
 import jsPDF from 'jspdf';
 
 declare global {
-  interface Window { API: any; }
+  interface Window { API_1484_11: any; }
 }
 
 @Component({
@@ -28,16 +28,17 @@ export class NumbasComponent implements OnInit {
     iframe.style.height = '800px';
     document.body.appendChild(iframe);
 
-    window.API = {
-      LMSInitialize: () => { return this.lmsService.LMSInitialize(); },
-      LMSFinish: () => { return this.lmsService.LMSFinish(); },
-      LMSGetValue: (element: string) => { return this.lmsService.LMSGetValue(element); },
-      LMSSetValue: (element: string, value: string) => { return this.lmsService.LMSSetValue(element, value); },
-      LMSCommit: () => { return this.lmsService.LMSCommit(); },
-      LMSGetLastError: () => { return this.lmsService.LMSGetLastError(); },
-      LMSGetErrorString: (errorCode: string) => { return this.lmsService.LMSGetErrorString(errorCode); },
-      LMSGetDiagnostic: (errorCode: string) => { return this.lmsService.LMSGetDiagnostic(errorCode); }
+    window.API_1484_11 =  {
+      Initialize: () => this.lmsService.Initialize(),
+      Terminate: () => this.lmsService.Terminate(),
+      GetValue: (element: string) => this.lmsService.GetValue(element),
+      SetValue: (element: string, value: string) => this.lmsService.SetValue(element, value),
+      Commit: () => this.lmsService.Commit(),
+      GetLastError: () => this.lmsService.GetLastError(),
+      GetErrorString: (errorCode: string) => this.lmsService.GetErrorString(errorCode),
+      GetDiagnostic: (errorCode: string) => this.lmsService.GetDiagnostic(errorCode)
     };
+    
   }
 
   interceptIframeRequests(): void {
