@@ -19,14 +19,6 @@ export class NumbasComponent implements OnInit {
 
   ngOnInit(): void {
     this.interceptIframeRequests();
-  }
-
-  launchNumbasTest(): void {
-    const iframe = document.createElement('iframe');
-    iframe.src = 'http://localhost:4200/api/numbas_api/index.html';
-    iframe.style.width = '100%';
-    iframe.style.height = '800px';
-    document.body.appendChild(iframe);
 
     window.API_1484_11 =  {
       Initialize: () => this.lmsService.Initialize(),
@@ -38,7 +30,19 @@ export class NumbasComponent implements OnInit {
       GetErrorString: (errorCode: string) => this.lmsService.GetErrorString(errorCode),
       GetDiagnostic: (errorCode: string) => this.lmsService.GetDiagnostic(errorCode)
     };
-    
+  }
+
+  launchNumbasTest(): void {
+    const iframe = document.createElement('iframe');
+    iframe.src = 'http://localhost:4201/api/numbas_api/index.html';
+    iframe.style.width = '100%';
+    iframe.style.height = '800px';
+    document.body.appendChild(iframe);
+  }
+
+  removeNumbasTest(): void {
+    const iframe = document.getElementsByTagName('iframe')[0];
+    iframe?.parentNode?.removeChild(iframe);
   }
 
   interceptIframeRequests(): void {

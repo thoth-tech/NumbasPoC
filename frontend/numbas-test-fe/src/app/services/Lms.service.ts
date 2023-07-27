@@ -8,12 +8,12 @@ declare let pipwerks: any;
   providedIn: 'root'
 })
 export class LmsService {
-  dataStore: { [key: string]: any } = {}; 
+  dataStore: { [key: string]: any } = {};
   initialized: boolean = false;
   constructor(private http: HttpClient) {
-    pipwerks.SCORM.version = "2004"; 
+    pipwerks.SCORM.version = "2004";
     console.log(`SCORM version is set to: ${pipwerks.SCORM.version}`);
-    
+
   }
   Initialize(): string {
     return 'true';
@@ -22,7 +22,7 @@ export class LmsService {
   Terminate(): string {
     const success = pipwerks.SCORM.connection.terminate();
 
-   
+
     const examResult = pipwerks.SCORM.data.get("cmi.score.raw");
     const status = this.GetValue("cmi.completion_status");
 
@@ -47,7 +47,8 @@ export class LmsService {
 
   GetValue(element: string): string {
     console.log('API.GetValue()', element);
-    let result = '';
+    let result: string;
+
     switch (element) {
         case 'cmi.completion_status':
             result = this.dataStore[element] || 'not attempted';
@@ -82,6 +83,12 @@ SetValue(element: string, value: any): string {
   if (element.startsWith('cmi.')) {
       this.dataStore[element] = value;
   }
+
+  if (element === 'cmi.exit' && value === 'suspend') {
+    // https://scorm.com/scorm-explained/technical-scorm/run-time/run-time-reference/
+    this.dataStore['cmi.entry'] = 'resume';
+  }
+
   return 'true';
 }
 
