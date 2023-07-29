@@ -77,7 +77,7 @@
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
   "workspaceFolder": "/workspace",
 
-  "forwardPorts": [3000,4201,9876],
+  "forwardPorts": [3000,4200,9876],
 
   "postCreateCommand": "/workspace/.devcontainer/post_create.sh",
   "postStartCommand": "/workspace/.devcontainer/post_start.sh",
