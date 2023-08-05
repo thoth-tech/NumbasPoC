@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, map, of, switchMap } from 'rxjs';
 import { SaveTest } from './models/savetest';
 
 @Injectable({
@@ -40,8 +40,25 @@ export class SaveTestService {
   }
 
   getLatestTestResult(): Observable<any> {
-    return this.http.get(`${this.apiBaseUrl}/latest`);
+    return this.http.get<SaveTest[]>(`${this.apiBaseUrl}`).pipe(
+      switchMap((tests) => {
+        if (tests.length > 0) {
+          // If there are tests, return the latest one
+          return of(tests[tests.length - 1]);
+        } else {
+          // If there are no tests, create a new one
+          const newTestDetails = {
+            name: 'New Test Name',
+            attempt_number: 1,
+            pass_status: false,
+            suspend_data: '', // Initial suspend data if needed
+          };
+          return this.createTestResult(newTestDetails);
+        }
+      })
+    );
   }
+
 
   updateSuspendData(id: string, suspend_data: string): Observable<any> {
     return this.http.put(`${this.apiBaseUrl}/${id}/suspend`, { suspend_data });
