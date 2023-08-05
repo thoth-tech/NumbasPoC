@@ -22,11 +22,15 @@ export class LmsService {
     this.saveTestService.getLatestTestResult().subscribe((latestTest) => {
       if (latestTest) {
         if (latestTest.completed === false) {
-          // Existing test that is not complete
-          this.dataStore = JSON.parse(latestTest.suspend_data);
-          this.dataStore['testId'] = latestTest.id; // Set the existing test ID
-          console.log(`Resuming Test ID: ${latestTest.id}`);
-          this.dataStore['cmi.entry'] = 'resume';
+          // Existing test that is not complete, parse the suspend_data
+          try {
+            this.dataStore = JSON.parse(latestTest.suspend_data || '{}');
+            this.dataStore['testId'] = latestTest.id; // Set the existing test ID
+            console.log(`Resuming Test ID: ${latestTest.id}`);
+            this.dataStore['cmi.entry'] = 'resume';
+          } catch (error) {
+            console.error('Error parsing suspend_data:', error);
+          }
         } else {
           // Existing test that is complete, create a new test
           this.createNewTest(latestTest.attempt_number + 1);
@@ -40,18 +44,21 @@ export class LmsService {
     return 'true';
   }
 
+
   private createNewTest(attemptNumber: number) {
     const newTestDetails = {
       name: 'New Test Name',
       attempt_number: attemptNumber,
       pass_status: false,
-      suspend_data: '', // Initial suspend data if needed
+      suspend_data: '{}',
+      completed: false,
     };
 
     this.saveTestService.createTestResult(newTestDetails).subscribe((newTest) => {
       // Initialize the new test attempt as needed
       console.log(`Creating new Test ID: ${newTest.id}`);
-      this.dataStore['testId'] = newTest.id; // Set the new test ID in the data store
+      this.dataStore['testId'] = newTest.id;
+
     });
   }
 
@@ -176,27 +183,5 @@ Commit(): string {
       return this.saveTestService.createTestResult(data);
     }
   }
-
-
-  updateTestResult(testId: string, data: any): Observable<any> {
-    const url = `http://localhost:3000/api/savetest/${testId}`;
-    return this.http.put(url, data);
-  }
-
-  createTestResult(data: any): Observable<any> {
-    const url = `http://localhost:3000/api/savetest`;
-    return this.http.post(url, data);
-  }
-
-  updateSuspendData(testId: string, suspendData: string): Observable<any> {
-    const url = `http://localhost:3000/api/savetest/${testId}`;
-    return this.http.put(url, { suspend_data: suspendData });
-  }
-
-  getLatestTestResult(): Observable<any> {
-    const url = `http://localhost:3000/api/savetest/latest`; // Make sure this endpoint exists on the server
-    return this.http.get(url);
-  }
-
 
 }

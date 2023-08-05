@@ -1,5 +1,5 @@
 class SaveTestAPI < Grape::API
-  resources :savetest do
+  resources :savetests do
     desc 'Get all test results'
     get do
       SaveTest.all
@@ -46,6 +46,16 @@ class SaveTestAPI < Grape::API
     end
     delete ':id' do
       SaveTest.find(params[:id]).destroy!
+    end
+    desc 'Update suspend data for a test result'
+    params do
+      requires :id, type: String, desc: 'ID of the test'
+      requires :suspend_data, type: String, desc: 'Suspended data in JSON'
+    end
+    put ':id/suspend' do
+      test = SaveTest.find(params[:id])
+      test.update!(suspend_data: params[:suspend_data])
+      test
     end
   end
 end
