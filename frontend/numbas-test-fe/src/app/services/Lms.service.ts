@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { SaveTestService } from './savetest.service';
+import { BehaviorSubject } from 'rxjs';
 
 declare let pipwerks: any;
 
@@ -10,7 +11,7 @@ declare let pipwerks: any;
 })
 export class LmsService {
   dataStore: { [key: string]: any } = {};
-  initialized: boolean = false;
+  initializationComplete$ = new BehaviorSubject<boolean>(false);
 
   constructor(private http: HttpClient, private saveTestService: SaveTestService) {
     pipwerks.SCORM.version = "2004";
@@ -19,36 +20,22 @@ export class LmsService {
 
   Initialize(): string {
     console.log('Initialize() function called');
-    this.saveTestService.getLatestTestResult().subscribe((latestTest) => {
+    this.saveTestService.getLatestTestResult().subscribe(latestTest => {
       if (latestTest) {
         if (latestTest.completed === false) {
-          // Existing test that is not complete, parse the suspend_data
-          try {
-            console.log("resuming old test")
-            this.dataStore = JSON.parse(latestTest.suspend_data || '{}');
-            this.dataStore['testId'] = latestTest.id; // Set the existing test ID
-            console.log(`Resuming Test ID: ${latestTest.id}`);
-            this.dataStore['cmi.entry'] = 'resume';
-          } catch (error) {
-            console.error('Error parsing suspend_data:', error);
-          }
+          this.resumeExistingTest(latestTest);
         } else {
-          // Existing test that is complete, create a new test
-          console.log("creating new test - previous test completed")
-          this.createNewTest(latestTest.attempt_number + 1);
+          this.createNewTest(latestTest.attempt_number + 1, 'completed');
         }
       } else {
-        // No previous test found, create a new test
-        console.log("no test found creating new test")
-        this.createNewTest(1);
+        this.createNewTest(1, 'not attempted');
       }
+      this.initializationComplete$.next(true);  // Signal that initialization is complete
     });
-
     return 'true';
 }
 
-// Creates a new blank test and resets the data store.
-  private createNewTest(attemptNumber: number) {
+  private createNewTest(attemptNumber: number, completionStatus: string) {
     console.log('Create New Test Called');
     const newTestDetails = {
       name: 'New Test Name',
@@ -58,20 +45,31 @@ export class LmsService {
       completed: false,
     };
 
-    this.saveTestService.createTestResult(newTestDetails).subscribe((newTest) => {
-      // Reset the dataStore to ensure no old test data is present
-      this.dataStore = {};
-
-      // Save the new test details to the dataStore
-      this.dataStore['testId'] = newTest.id;
-      this.dataStore['name'] = newTest.name;
-      this.dataStore['attempt_number'] = newTest.attempt_number;
-      this.dataStore['pass_status'] = newTest.pass_status;
-      this.dataStore['suspend_data'] = JSON.parse(newTest.suspend_data);
-      this.dataStore['completed'] = newTest.completed;
+    this.saveTestService.createTestResult(newTestDetails).subscribe(newTest => {
+      this.dataStore = {
+        testId: newTest.id,
+        name: newTest.name,
+        attempt_number: newTest.attempt_number,
+        pass_status: newTest.pass_status,
+        suspend_data: JSON.parse(newTest.suspend_data),
+        completed: newTest.completed,
+        'cmi.entry': 'ab-initio',
+        'cmi.completion_status': completionStatus
+      };
     });
-}
-
+  }
+  private resumeExistingTest(latestTest: any) {
+    console.log("Resuming old test");
+    try {
+      this.dataStore = JSON.parse(latestTest.suspend_data || '{}');
+      this.dataStore['testId'] = latestTest.id;
+      this.dataStore['cmi.entry'] = 'resume';
+      this.dataStore['cmi.completion_status'] = 'incomplete';
+      console.log(`Resuming Test ID: ${latestTest.id}`);
+    } catch (error) {
+      console.error('Error parsing suspend_data:', error);
+    }
+  }
 
   getCurrentTestId(): string {
     return this.dataStore?.['testId'];
@@ -154,6 +152,10 @@ SetValue(element: string, value: any): string {
 
 
 Commit(): string {
+  if (!this.initializationComplete$.getValue()) {
+    console.warn('Initialization not complete. Cannot commit.');
+    return 'false';
+  }
   console.log('Commit function called');
   const testId = this.getCurrentTestId();
   if (!testId) {
@@ -189,10 +191,14 @@ Commit(): string {
   }
 
   saveTestData(testId: string, score: string, status: string, completed: boolean): Observable<any> {
-    console.log('save TEst Data Called');
+    console.log('save TestData Called');
+
+    // Retrieve the current attempt number from the dataStore
+    const currentAttemptNumber = this.dataStore['attempt_number'] || 0;
+
     const data = {
       name: 'Test Name',
-      attempt_number: 1, // You may want to handle this dynamically
+      attempt_number: currentAttemptNumber + 1, // Increment the attempt number
       pass_status: status === 'passed',
       suspend_data: JSON.stringify({ score: score }),
       completed: completed
@@ -203,6 +209,6 @@ Commit(): string {
     } else {
       return this.saveTestService.createTestResult(data);
     }
-  }
+}
 
 }
