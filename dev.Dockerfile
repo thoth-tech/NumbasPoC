@@ -46,6 +46,15 @@ RUN apt-get update \
   && node --version \
   && npm --version \
   && gem install bundler
+# Install MariaDB server
+RUN apt-get update && apt-get install -y mariadb-server && apt-get clean
+
+# Copy the initialization script
+COPY .devcontainer/init-mariadb.sh /tmp/init-mariadb.sh
+
+RUN chmod +x /tmp/init-mariadb.sh
+# Expose the MariaDB port
+EXPOSE 3306
 
 USER "${USER}"
 

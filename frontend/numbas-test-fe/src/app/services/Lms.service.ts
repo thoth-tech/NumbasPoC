@@ -24,6 +24,7 @@ export class LmsService {
         if (latestTest.completed === false) {
           // Existing test that is not complete, parse the suspend_data
           try {
+            console.log("resuming old test")
             this.dataStore = JSON.parse(latestTest.suspend_data || '{}');
             this.dataStore['testId'] = latestTest.id; // Set the existing test ID
             console.log(`Resuming Test ID: ${latestTest.id}`);
@@ -33,19 +34,22 @@ export class LmsService {
           }
         } else {
           // Existing test that is complete, create a new test
+          console.log("creating new test - previous test completed")
           this.createNewTest(latestTest.attempt_number + 1);
         }
       } else {
         // No previous test found, create a new test
+        console.log("no test found creating new test")
         this.createNewTest(1);
       }
     });
 
     return 'true';
-  }
+}
 
-
+// Creates a new blank test and resets the data store.
   private createNewTest(attemptNumber: number) {
+    console.log('Create New Test Called');
     const newTestDetails = {
       name: 'New Test Name',
       attempt_number: attemptNumber,
@@ -55,12 +59,19 @@ export class LmsService {
     };
 
     this.saveTestService.createTestResult(newTestDetails).subscribe((newTest) => {
-      // Initialize the new test attempt as needed
-      console.log(`Creating new Test ID: ${newTest.id}`);
-      this.dataStore['testId'] = newTest.id;
+      // Reset the dataStore to ensure no old test data is present
+      this.dataStore = {};
 
+      // Save the new test details to the dataStore
+      this.dataStore['testId'] = newTest.id;
+      this.dataStore['name'] = newTest.name;
+      this.dataStore['attempt_number'] = newTest.attempt_number;
+      this.dataStore['pass_status'] = newTest.pass_status;
+      this.dataStore['suspend_data'] = JSON.parse(newTest.suspend_data);
+      this.dataStore['completed'] = newTest.completed;
     });
-  }
+}
+
 
   getCurrentTestId(): string {
     return this.dataStore?.['testId'];
@@ -71,20 +82,27 @@ export class LmsService {
   }
 
   Terminate(): string {
+    console.log('Terminate Called');
     const success = pipwerks.SCORM.connection.terminate();
     const examResult = pipwerks.SCORM.data.get("cmi.score.raw");
     const status = this.GetValue("cmi.completion_status");
     const testId = this.getCurrentTestId();
-    const completed = this.isTestCompleted();
 
-    this.saveTestData(testId, examResult, status, completed).subscribe((response) => {
+    // Set the test to be completed
+    this.dataStore['completed'] = true;
+
+    // Save the current state of the test and mark it as completed
+    this.saveTestData(testId, examResult, status, true).subscribe((response) => {
       console.log(response);
     }, (error) => {
       console.error('Error sending test data:', error);
     });
 
+    // Commit the current state of the dataStore to the backend
+    this.Commit();
+
     return 'true';
-  }
+}
 
   GetValue(element: string): string {
     console.log('API.GetValue()', element);
@@ -157,6 +175,7 @@ Commit(): string {
 
 
   GetLastError(): string {
+    console.log('Get Last Error called');
     return "0";
   }
 
@@ -165,10 +184,12 @@ Commit(): string {
   }
 
   GetDiagnostic(errorCode: string): string {
+    console.log('Get Diagnoistic called');
     return '';
   }
 
   saveTestData(testId: string, score: string, status: string, completed: boolean): Observable<any> {
+    console.log('save TEst Data Called');
     const data = {
       name: 'Test Name',
       attempt_number: 1, // You may want to handle this dynamically

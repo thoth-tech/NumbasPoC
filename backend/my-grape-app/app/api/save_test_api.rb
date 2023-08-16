@@ -2,7 +2,7 @@ class SaveTestAPI < Grape::API
   resources :savetests do
     desc 'Get all test results'
     get do
-      SaveTest.all
+      SaveTest.order(id: :desc)
     end
 
     desc 'Get a specific test result'
