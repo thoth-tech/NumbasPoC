@@ -83,7 +83,7 @@ export class LmsService {
 
   Terminate(): string {
     console.log('Terminate Called');
-    const success = pipwerks.SCORM.connection.terminate();
+
     const examResult = pipwerks.SCORM.data.get("cmi.score.raw");
     const status = this.GetValue("cmi.completion_status");
     const testId = this.getCurrentTestId();
@@ -100,7 +100,7 @@ export class LmsService {
 
     // Commit the current state of the dataStore to the backend
     this.Commit();
-
+    const success = pipwerks.SCORM.connection.terminate();
     return 'true';
 }
 

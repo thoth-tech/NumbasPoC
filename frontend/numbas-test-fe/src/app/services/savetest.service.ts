@@ -43,7 +43,7 @@ export class SaveTestService {
     return this.http.get<SaveTest[]>(`${this.apiBaseUrl}`).pipe(
       switchMap((tests) => {
         if (tests.length > 0) {
-          return of(tests[tests.length - 1]);
+          return of(tests[0]);
         } else {
           const newTestDetails = {
             name: 'New Test Name',
