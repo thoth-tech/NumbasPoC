@@ -21,6 +21,7 @@ export class LmsService {
   Initialize(): string {
     console.log('Initialize() function called');
     this.saveTestService.getLatestTestResult().subscribe(latestTest => {
+      console.log('Latest test result:', latestTest);
       if (latestTest) {
         if (latestTest.completed === false) {
           this.resumeExistingTest(latestTest);
@@ -34,6 +35,7 @@ export class LmsService {
     });
     return 'true';
 }
+
 
   private createNewTest(attemptNumber: number, completionStatus: string) {
     console.log('Create New Test Called');
