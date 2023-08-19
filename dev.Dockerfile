@@ -95,6 +95,7 @@ COPY --chown="${USER}":"${USER}" .devcontainer /workspace/.devcontainer
 
 ENV HISTFILE /workspace/tmp/.zsh_history
 
+
 RUN sudo chmod +x /workspace/.devcontainer/*.sh
 ENTRYPOINT [ "/workspace/.devcontainer/docker-entrypoint.sh" ]
 CMD [ "sleep", "infinity" ]
