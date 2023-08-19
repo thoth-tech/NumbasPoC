@@ -10,176 +10,200 @@ declare let pipwerks: any;
   providedIn: 'root'
 })
 export class LmsService {
-  dataStore: { [key: string]: any } = {};
+  // Default values for the dataStore
+  private defaultDataStore = {
+    testId: null,
+    name: null,
+    attempt_number: 0,
+    pass_status: false,
+    suspend_data: '{}',
+    completed: false,
+    'cmi.entry': 'ab-initio',
+    'cmi.completion_status': 'not attempted',
+    'cmi.learner_id': null
+  };
+
+  // The main data store that holds the current state of the test
+  dataStore: { [key: string]: any } = { ...this.defaultDataStore };
+
+  // Observable to track if initialization is complete
   initializationComplete$ = new BehaviorSubject<boolean>(false);
 
   constructor(private http: HttpClient, private saveTestService: SaveTestService) {
+    // Set the SCORM version
     pipwerks.SCORM.version = "2004";
     console.log(`SCORM version is set to: ${pipwerks.SCORM.version}`);
   }
 
-  Initialize(): string {
-    console.log('Initialize() function called');
-    this.saveTestService.getLatestTestResult().subscribe(latestTest => {
-      console.log('Latest test result:', latestTest);
-      if (latestTest) {
-        if (latestTest.completed === false) {
-          this.resumeExistingTest(latestTest);
-        } else {
-          this.createNewTest(latestTest.attempt_number + 1, 'completed');
-        }
+// Initialize the LMS service
+Initialize(): string {
+  console.log('Initialize() function called');
+  // In Ontrack this would be set by the logged in students ID
+  const studentId = 123456;
+  this.dataStore['cmi.learner_id'] = studentId;
+
+  // Fetch the latest test result
+  this.saveTestService.getLatestTestResult().subscribe(latestTest => {
+    console.log('Latest test result:', latestTest);
+    if (latestTest) {
+      if (latestTest.completed === false) {
+        // If the latest test is not completed, resume it
+        this.resumeExistingTest(latestTest);
       } else {
-        this.createNewTest(1, 'not attempted');
+        // If the latest test is completed, create a new one with incremented attempt number
+        this.createNewTest(latestTest.attempt_number + 1, 'completed');
       }
-      this.initializationComplete$.next(true);  // Signal that initialization is complete
-    });
-    return 'true';
+    } else {
+      // If there's no latest test, create a new one with attempt number set to 0
+      this.createNewTest(0, 'not attempted');
+    }
+    this.initializationComplete$.next(true);
+  });
+  return 'true';
 }
 
+// Create a new test
+private createNewTest(attemptNumber: number, completionStatus: string) {
+  console.log('Create New Test Called');
 
-  private createNewTest(attemptNumber: number, completionStatus: string) {
-    console.log('Create New Test Called');
-    const newTestDetails = {
-      name: 'New Test Name',
-      attempt_number: attemptNumber,
-      pass_status: false,
-      suspend_data: '{}',
-      completed: false,
-    };
+  // Reset the dataStore to default values
+  this.resetDataStore();
 
-    this.saveTestService.createTestResult(newTestDetails).subscribe(newTest => {
-      this.dataStore = {
-        testId: newTest.id,
-        name: newTest.name,
-        attempt_number: newTest.attempt_number,
-        pass_status: newTest.pass_status,
-        suspend_data: JSON.parse(newTest.suspend_data),
-        completed: newTest.completed,
-        'cmi.entry': 'ab-initio',
-        'cmi.completion_status': completionStatus
-      };
-    });
+  // Set the completion status
+  this.dataStore['cmi.completion_status'] = completionStatus;
+
+  // Define the details for the new test
+  const newTestDetails = {
+    //Name can be pulled from TaskDef in main system
+    name: 'PlaceholderTestName',
+    attempt_number: attemptNumber,
+    pass_status: false,
+    suspend_data: '{}',
+    completed: false
+  };
+
+  // Save the new test to the backend
+  this.saveTestService.createTestResult(newTestDetails).subscribe(newTest => {
+    this.dataStore['testId'] = newTest.id;
+  }, error => {
+    console.error('Error creating a new test:', error);
+  });
+}
+
+  // Reset the dataStore to its default state
+  private resetDataStore() {
+    this.dataStore = { ...this.defaultDataStore };
   }
+
+  // Resume an existing test
   private resumeExistingTest(latestTest: any) {
     console.log("Resuming old test");
     try {
-      this.dataStore = JSON.parse(latestTest.suspend_data || '{}');
-      this.dataStore['testId'] = latestTest.id;
-      this.dataStore['cmi.entry'] = 'resume';
-      this.dataStore['cmi.completion_status'] = 'incomplete';
+      // Parse the suspend data from the latest test
+      const parsedSuspendData = JSON.parse(latestTest.suspend_data || '{}');
+
+      // Update the dataStore with the parsed suspend data and other details from the latest test
+      this.dataStore = {
+        ...this.defaultDataStore,
+        ...parsedSuspendData,
+        testId: latestTest.id,
+        'cmi.entry': 'resume',
+        'cmi.completion_status': 'incomplete'
+      };
       console.log(`Resuming Test ID: ${latestTest.id}`);
     } catch (error) {
       console.error('Error parsing suspend_data:', error);
     }
   }
 
+  // Get the current test ID
   getCurrentTestId(): string {
     return this.dataStore?.['testId'];
   }
 
+  // Check if the test is completed
   isTestCompleted(): boolean {
     return this.dataStore?.['completed'] || false;
   }
 
+  // Terminate the current test
   Terminate(): string {
     console.log('Terminate Called');
 
-    const examResult = pipwerks.SCORM.data.get("cmi.score.raw");
+    const examResult = this.dataStore["cmi.score.raw"];
     const status = this.GetValue("cmi.completion_status");
     const testId = this.getCurrentTestId();
 
-    // Set the test to be completed
+    // Mark the test as completed
     this.dataStore['completed'] = true;
 
-    // Save the current state of the test and mark it as completed
+    // Save the current state of the test and mark it as completed in the backend
     this.saveTestData(testId, examResult, status, true).subscribe((response) => {
       console.log(response);
+      this.dataStore['completed'] = true;
     }, (error) => {
       console.error('Error sending test data:', error);
     });
-
-    // Commit the current state of the dataStore to the backend
-    this.Commit();
-    const success = pipwerks.SCORM.connection.terminate();
     return 'true';
-}
+  }
 
+  // Get a value from the dataStore or return a default value
   GetValue(element: string): string {
     console.log('API.GetValue()', element);
-    let result: string;
 
-    switch (element) {
-        case 'cmi.completion_status':
-            result = this.dataStore[element] || 'not attempted';
-            break;
-        case 'cmi.entry':
-            result = this.dataStore[element] || 'ab-initio';
-            break;
-        case 'cmi.objectives._count':
-        case 'cmi.interactions._count':
-            result = this.dataStore[element] || '0';
-            break;
-        case 'numbas.user_role':
-            result = this.dataStore[element] || 'learner';
-            break;
-        case 'numbas.duration_extension.amount':
-            result = this.dataStore[element] || '0';
-            break;
-        case 'numbas.duration_extension.units':
-            result = this.dataStore[element] || 'seconds';
-            break;
-        case 'cmi.mode':
-            result = this.dataStore[element] || 'normal';
-            break;
-        default:
-            result = this.dataStore[element] || '';
-    }
-    return result;
-}
+    // Default values for specific SCORM elements
+    const defaultValues: { [key: string]: string } = {
+        'cmi.completion_status': 'not attempted',
+        'cmi.entry': 'ab-initio',
+        'cmi.objectives._count': '0',
+        'cmi.interactions._count': '0',
+        'numbas.user_role': 'learner',
+        'numbas.duration_extension.amount': '0',
+        'numbas.duration_extension.units': 'seconds',
+        'cmi.mode': 'normal'
+    };
 
+    return this.dataStore[element] || defaultValues[element] || '';
+  }
 
-SetValue(element: string, value: any): string {
-  console.log('set value called');
-  if (element.startsWith('cmi.')) {
+  // Set a value in the dataStore
+  SetValue(element: string, value: any): string {
+    if (element.startsWith('cmi.')) {
       this.dataStore[element] = value;
-  }
-
-  if (element === 'cmi.exit' && value === 'suspend') {
-    // https://scorm.com/scorm-explained/technical-scorm/run-time/run-time-reference/
-    this.dataStore['cmi.entry'] = 'resume';
-  }
-
-  return 'true';
-}
-
-
-Commit(): string {
-  if (!this.initializationComplete$.getValue()) {
-    console.warn('Initialization not complete. Cannot commit.');
-    return 'false';
-  }
-  console.log('Commit function called');
-  const testId = this.getCurrentTestId();
-  if (!testId) {
-    console.error('Test ID is undefined. Cannot commit.');
-    return 'false';
-  }
-  const suspendDataString = JSON.stringify(this.dataStore);
-  this.saveTestService.updateSuspendData(testId, suspendDataString).subscribe(
-    () => {
-      console.log('Suspend data saved successfully.');
-    },
-    (error) => {
-      console.error('Error saving suspend data:', error);
     }
-  );
+    return 'true';
+  }
 
-  return 'true';
-}
+  // Commit the current state of the test to the backend
+  Commit(): string {
+    if (!this.initializationComplete$.getValue()) {
+      console.warn('Initialization not complete. Cannot commit.');
+      return 'false';
+    }
 
+    const testId = this.dataStore['testId'];
+    if (!testId) {
+      console.error('Test ID is missing from dataStore. Cannot commit.');
+      return 'false';
+    }
 
+    const suspendDataString = JSON.stringify(this.dataStore);
+
+    this.saveTestService.updateSuspendData(testId, suspendDataString).subscribe(
+      () => {
+        console.log('Suspend data saved successfully.');
+      },
+      (error) => {
+        console.error('Error saving suspend data:', error);
+      }
+    );
+
+    return 'true';
+  }
+
+  // Placeholder methods for SCORM error handling
   GetLastError(): string {
-    console.log('Get Last Error called');
+    //console.log('Get Last Error called');
     return "0";
   }
 
@@ -188,19 +212,19 @@ Commit(): string {
   }
 
   GetDiagnostic(errorCode: string): string {
-    console.log('Get Diagnoistic called');
+    //console.log('Get Diagnoistic called');
     return '';
   }
 
+  // Save test data to the backend
   saveTestData(testId: string, score: string, status: string, completed: boolean): Observable<any> {
     console.log('save TestData Called');
 
-    // Retrieve the current attempt number from the dataStore
     const currentAttemptNumber = this.dataStore['attempt_number'] || 0;
 
     const data = {
       name: 'Test Name',
-      attempt_number: currentAttemptNumber + 1, // Increment the attempt number
+      attempt_number: currentAttemptNumber,
       pass_status: status === 'passed',
       suspend_data: JSON.stringify({ score: score }),
       completed: completed
@@ -211,6 +235,5 @@ Commit(): string {
     } else {
       return this.saveTestService.createTestResult(data);
     }
-}
-
+  }
 }

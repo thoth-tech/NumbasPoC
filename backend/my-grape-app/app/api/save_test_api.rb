@@ -1,10 +1,20 @@
 class SaveTestAPI < Grape::API
+  # Define a set of routes under the 'savetests' resource
   resources :savetests do
+    
+    # Endpoint to retrieve all test results, ordered by ID in descending order
     desc 'Get all test results'
     get do
       SaveTest.order(id: :desc)
     end
 
+    # Endpoint to retrieve the latest test result
+    desc 'Get the latest test result'
+    get 'latest' do
+      SaveTest.order(id: :desc).first
+    end
+
+    # Endpoint to retrieve a specific test result by its ID
     desc 'Get a specific test result'
     params do
       requires :id, type: String, desc: 'ID of the test'
@@ -13,6 +23,7 @@ class SaveTestAPI < Grape::API
       SaveTest.where(id: params[:id]).first!
     end
 
+    # Endpoint to create a new test result
     desc 'Create a test result'
     params do
       requires :name, type: String, desc: 'Name of the test'
@@ -26,6 +37,7 @@ class SaveTestAPI < Grape::API
       SaveTest.create!(params)
     end
 
+    # Endpoint to update an existing test result by its ID
     desc 'Update a test result'
     params do
       requires :id, type: String, desc: 'ID of the test'
@@ -40,6 +52,7 @@ class SaveTestAPI < Grape::API
       SaveTest.find(params[:id]).update!(params.except(:id))
     end
 
+    # Endpoint to delete a specific test result by its ID
     desc 'Delete a test result'
     params do
       requires :id, type: String, desc: 'ID of the test'
@@ -47,6 +60,8 @@ class SaveTestAPI < Grape::API
     delete ':id' do
       SaveTest.find(params[:id]).destroy!
     end
+
+    # Endpoint to update the suspend data for a specific test result by its ID
     desc 'Update suspend data for a test result'
     params do
       requires :id, type: String, desc: 'ID of the test'
