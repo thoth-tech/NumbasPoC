@@ -35,32 +35,38 @@ export class LmsService {
     console.log(`SCORM version is set to: ${pipwerks.SCORM.version}`);
   }
 
-// Initialize the LMS service
-Initialize(): string {
-  console.log('Initialize() function called');
-  // In Ontrack this would be set by the logged in students ID
-  const studentId = 123456;
-  this.dataStore['cmi.learner_id'] = studentId;
+  Initialize(): string {
+    console.log('Initialize() function called');
+    const studentId = 123456;
+    this.dataStore['cmi.learner_id'] = studentId;
 
-  // Fetch the latest test result
-  this.saveTestService.getLatestTestResult().subscribe(latestTest => {
-    console.log('Latest test result:', latestTest);
+    const latestTest = this.getLatestTestResult();
+
     if (latestTest) {
       if (latestTest.completed === false) {
-        // If the latest test is not completed, resume it
         this.resumeExistingTest(latestTest);
       } else {
-        // If the latest test is completed, create a new one with incremented attempt number
         this.createNewTest(latestTest.attempt_number + 1, 'completed');
       }
     } else {
-      // If there's no latest test, create a new one with attempt number set to 0
       this.createNewTest(0, 'not attempted');
     }
     this.initializationComplete$.next(true);
-  });
-  return 'true';
-}
+    return 'true';
+  }
+
+  private getLatestTestResult(): any {
+    const xhr = new XMLHttpRequest();
+    xhr.open("GET", "http://localhost:3000/api/savetests/latest.txt", false);
+    xhr.send();
+
+    if (xhr.status !== 200) {
+      console.error('Error fetching latest test result:', xhr.statusText);
+      return null;
+    }
+
+    return JSON.parse(xhr.responseText);
+  }
 
 // Create a new test
 private createNewTest(attemptNumber: number, completionStatus: string) {
@@ -102,15 +108,18 @@ private createNewTest(attemptNumber: number, completionStatus: string) {
       // Parse the suspend data from the latest test
       const parsedSuspendData = JSON.parse(latestTest.suspend_data || '{}');
 
+      // Reset the dataStore to its default state
+      this.resetDataStore();
+
       // Update the dataStore with the parsed suspend data and other details from the latest test
       this.dataStore = {
-        ...this.defaultDataStore,
-        ...parsedSuspendData,
+        ...this.dataStore, // Start with the current default values
+        ...parsedSuspendData, // Overwrite with the parsed suspend data
         testId: latestTest.id,
         'cmi.entry': 'resume',
         'cmi.completion_status': 'incomplete'
       };
-      console.log(`Resuming Test ID: ${latestTest.id}`);
+      console.log(`Resuming Test ID: ${latestTest.id} with data:`, this.dataStore);
     } catch (error) {
       console.error('Error parsing suspend_data:', error);
     }
@@ -138,10 +147,10 @@ private createNewTest(attemptNumber: number, completionStatus: string) {
     this.dataStore['completed'] = true;
 
     // Save the current state of the test and mark it as completed in the backend
-    this.saveTestData(testId, examResult, status, true).subscribe((response) => {
+    this.saveTestData(testId, examResult, status, true).subscribe((response: any) => {
       console.log(response);
       this.dataStore['completed'] = true;
-    }, (error) => {
+    }, (error: any) => {
       console.error('Error sending test data:', error);
     });
     return 'true';
@@ -201,6 +210,7 @@ private createNewTest(attemptNumber: number, completionStatus: string) {
     return 'true';
   }
 
+
   // Placeholder methods for SCORM error handling
   GetLastError(): string {
     //console.log('Get Last Error called');
@@ -215,25 +225,35 @@ private createNewTest(attemptNumber: number, completionStatus: string) {
     //console.log('Get Diagnoistic called');
     return '';
   }
+  private saveTestResultToBackend(data: any, testId?: string): any {
+    const xhr = new XMLHttpRequest();
+    const method = testId ? "PUT" : "POST";
+    const url = testId ? `http://localhost:3000/api/savetests/${testId}` : "http://localhost:3000/api/savetests";
 
-  // Save test data to the backend
-  saveTestData(testId: string, score: string, status: string, completed: boolean): Observable<any> {
-    console.log('save TestData Called');
+    xhr.open(method, url, false);
+    xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+    xhr.send(JSON.stringify(data));
 
-    const currentAttemptNumber = this.dataStore['attempt_number'] || 0;
-
-    const data = {
-      name: 'Test Name',
-      attempt_number: currentAttemptNumber,
-      pass_status: status === 'passed',
-      suspend_data: JSON.stringify({ score: score }),
-      completed: completed
-    };
-
-    if (testId) {
-      return this.saveTestService.updateTestResult(testId, data);
-    } else {
-      return this.saveTestService.createTestResult(data);
+    if (xhr.status !== 200) {
+      console.error('Error saving test result:', xhr.statusText);
+      return null;
     }
+
+    return JSON.parse(xhr.responseText);
   }
+ // Save test data to the backend
+ saveTestData(testId: string, score: string, status: string, completed: boolean): any {
+  console.log('saveTestData Called');
+  const currentAttemptNumber = this.dataStore['attempt_number'] || 0;
+  const data = {
+    name: 'Test Name',
+    attempt_number: currentAttemptNumber,
+    pass_status: status === 'passed',
+    suspend_data: JSON.stringify({ score: score }),
+    completed: completed
+  };
+
+  return this.saveTestResultToBackend(data, testId);
+}
+
 }
