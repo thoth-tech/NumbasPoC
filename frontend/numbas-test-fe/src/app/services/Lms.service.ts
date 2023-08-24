@@ -65,7 +65,7 @@ export class LmsService {
       return null;
     }
 
-    return JSON.parse(xhr.responseText);
+    return true;
   }
 
 // Create a new test
@@ -183,8 +183,14 @@ private createNewTest(attemptNumber: number, completionStatus: string) {
     return 'true';
   }
 
-  // Commit the current state of the test to the backend
-  Commit(): string {
+  private isCommitCalled = false;
+
+  async Commit(): Promise<string> {
+    if (this.isCommitCalled) {
+      console.warn('Commit function has already been called once.');
+      return 'false';
+    }
+
     if (!this.initializationComplete$.getValue()) {
       console.warn('Initialization not complete. Cannot commit.');
       return 'false';
@@ -198,17 +204,17 @@ private createNewTest(attemptNumber: number, completionStatus: string) {
 
     const suspendDataString = JSON.stringify(this.dataStore);
 
-    this.saveTestService.updateSuspendData(testId, suspendDataString).subscribe(
-      () => {
-        console.log('Suspend data saved successfully.');
-      },
-      (error) => {
-        console.error('Error saving suspend data:', error);
-      }
-    );
-
-    return 'true';
+    try {
+      await this.saveTestService.updateSuspendData(testId, suspendDataString).toPromise();
+      console.log('Suspend data saved successfully.');
+      this.isCommitCalled = true;
+      return 'true';
+    } catch (error) {
+      console.error('Error saving suspend data:', error);
+      return 'false';
+    }
   }
+
 
 
   // Placeholder methods for SCORM error handling
