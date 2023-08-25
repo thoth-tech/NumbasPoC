@@ -1,5 +1,10 @@
 module Entities
   class SaveTest < Grape::Entity
-    expose :id, :name, :attempt_number, :pass_status, :suspend_data, :completed, :attempted_at
+    expose :id
+    expose :name
+    expose :attempt_number
+    expose :pass_status
+    expose :suspend_data
+    expose :completed
   end
 end

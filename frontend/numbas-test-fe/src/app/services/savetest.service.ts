@@ -8,7 +8,7 @@ import { SaveTest } from './models/savetest';
 })
 export class SaveTestService {
   // Base URL for the API endpoint
-  private apiBaseUrl = 'http://localhost:3000/api/savetests';
+  private apiBaseUrl = 'http://localhost:3000/api/savetest/savetests';
 
   constructor(private http: HttpClient) {}
 
@@ -80,9 +80,29 @@ export class SaveTestService {
    * @param suspend_data - The new suspend data for the test result.
    * @returns An observable of the updated test result.
    */
-  updateSuspendData(id: string, suspend_data: string): Observable<any> {
-    return this.http.put(`${this.apiBaseUrl}/${id}/suspend`, { suspend_data });
+  updateSuspendData(id: string, suspend_data: any): Observable<any> {
+    let jsonData: string;
+
+    if (typeof suspend_data === 'string') {
+      try {
+        // Try to parse it to ensure it's valid JSON
+        JSON.parse(suspend_data);
+        jsonData = suspend_data;
+      } catch (e) {
+        return throwError('Provided string is not valid JSON');
+      }
+    } else {
+      // If it's not a string, try to stringify it
+      try {
+        jsonData = JSON.stringify(suspend_data);
+      } catch (e) {
+        return throwError('Failed to stringify provided data');
+      }
+    }
+
+    return this.http.put(`${this.apiBaseUrl}/${id}/suspend`, { suspend_data: jsonData });
   }
+
 
   /**
    * Deletes a specific test result.

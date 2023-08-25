@@ -7,6 +7,6 @@ Rails.application.routes.draw do
   # Defines the root path route ("/")
   # root "articles#index"
   mount NumbasAPI => '/api'
-  mount SaveTestAPI => '/api'
+  mount SaveTestAPI => '/api/savetest'
 
 end

@@ -1,6 +1,5 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
 import { SaveTestService } from './savetest.service';
 import { BehaviorSubject } from 'rxjs';
 
@@ -37,36 +36,39 @@ export class LmsService {
 
   Initialize(): string {
     console.log('Initialize() function called');
+
+    // In Ontrack this would be set by the logged in students ID
     const studentId = 123456;
     this.dataStore['cmi.learner_id'] = studentId;
 
-    const latestTest = this.getLatestTestResult();
-
-    if (latestTest) {
-      if (latestTest.completed === false) {
-        this.resumeExistingTest(latestTest);
-      } else {
-        this.createNewTest(latestTest.attempt_number + 1, 'completed');
-      }
-    } else {
-      this.createNewTest(0, 'not attempted');
-    }
-    this.initializationComplete$.next(true);
-    return 'true';
-  }
-
-  private getLatestTestResult(): any {
+    // Fetch the latest test using synchronous XMLHttpRequest
     const xhr = new XMLHttpRequest();
-    xhr.open("GET", "http://localhost:3000/api/savetests/latest.txt", false);
+    xhr.open("GET", "http://localhost:3000/api/savetest/savetests/latest", false);
     xhr.send();
+    console.log(xhr.responseText);
 
     if (xhr.status !== 200) {
       console.error('Error fetching latest test result:', xhr.statusText);
-      return null;
+      return 'false';
     }
 
-    return true;
-  }
+       // Ensure the response is valid JSON before parsing
+       let latestTest;
+       try {
+           latestTest = JSON.parse(xhr.responseText);
+           console.log('Latest test result:', latestTest);
+       } catch (error) {
+           console.error('Error parsing JSON:', error);
+           return 'false';
+       }
+
+       // Always resume the test, regardless of its 'completed' status
+       this.resumeExistingTest(latestTest);
+
+       this.initializationComplete$.next(true);
+       return 'true';
+   }
+
 
 // Create a new test
 private createNewTest(attemptNumber: number, completionStatus: string) {
@@ -135,7 +137,6 @@ private createNewTest(attemptNumber: number, completionStatus: string) {
     return this.dataStore?.['completed'] || false;
   }
 
-  // Terminate the current test
   Terminate(): string {
     console.log('Terminate Called');
 
@@ -146,15 +147,36 @@ private createNewTest(attemptNumber: number, completionStatus: string) {
     // Mark the test as completed
     this.dataStore['completed'] = true;
 
-    // Save the current state of the test and mark it as completed in the backend
-    this.saveTestData(testId, examResult, status, true).subscribe((response: any) => {
-      console.log(response);
-      this.dataStore['completed'] = true;
-    }, (error: any) => {
-      console.error('Error sending test data:', error);
-    });
+    const currentAttemptNumber = this.dataStore['attempt_number'] || 0;
+
+    const data = {
+        name: 'Test Name',
+        attempt_number: currentAttemptNumber,
+        pass_status: status === 'passed',
+        suspend_data: JSON.stringify({ score: examResult }),
+        completed: true
+    };
+
+    const xhr = new XMLHttpRequest();
+    if (testId) {
+        xhr.open("PUT", `http://localhost:3000/api/savetest/savetests/${testId}`, false);
+
+    } else {
+        xhr.open("POST", "http://localhost:3000/api/savetest/savetests", false);
+
+
+    }
+    xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+    xhr.send(JSON.stringify(data));
+
+    if (xhr.status !== 200) {
+        console.error('Error sending test data:', xhr.statusText);
+        return 'false';
+    }
+
     return 'true';
-  }
+}
+
 
   // Get a value from the dataStore or return a default value
   GetValue(element: string): string {
@@ -185,7 +207,7 @@ private createNewTest(attemptNumber: number, completionStatus: string) {
 
   private isCommitCalled = false;
 
-  async Commit(): Promise<string> {
+  Commit(): string {
     if (this.isCommitCalled) {
       console.warn('Commit function has already been called once.');
       return 'false';
@@ -203,19 +225,28 @@ private createNewTest(attemptNumber: number, completionStatus: string) {
     }
 
     const suspendDataString = JSON.stringify(this.dataStore);
+    const endpointUrl = `/api/savetest/savetest/${testId}/suspend`;
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', endpointUrl, false); // `false` makes it synchronous
+    xhr.setRequestHeader('Content-Type', 'application/json');
 
     try {
-      await this.saveTestService.updateSuspendData(testId, suspendDataString).toPromise();
-      console.log('Suspend data saved successfully.');
-      this.isCommitCalled = true;
-      return 'true';
+      xhr.send(suspendDataString);
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        console.log('Suspend data saved successfully.');
+        this.isCommitCalled = true;
+        return 'true';
+      } else {
+        console.error('Error saving suspend data:', xhr.statusText);
+        return 'false';
+      }
     } catch (error) {
       console.error('Error saving suspend data:', error);
       return 'false';
     }
   }
-
-
 
   // Placeholder methods for SCORM error handling
   GetLastError(): string {
@@ -231,35 +262,6 @@ private createNewTest(attemptNumber: number, completionStatus: string) {
     //console.log('Get Diagnoistic called');
     return '';
   }
-  private saveTestResultToBackend(data: any, testId?: string): any {
-    const xhr = new XMLHttpRequest();
-    const method = testId ? "PUT" : "POST";
-    const url = testId ? `http://localhost:3000/api/savetests/${testId}` : "http://localhost:3000/api/savetests";
 
-    xhr.open(method, url, false);
-    xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
-    xhr.send(JSON.stringify(data));
-
-    if (xhr.status !== 200) {
-      console.error('Error saving test result:', xhr.statusText);
-      return null;
-    }
-
-    return JSON.parse(xhr.responseText);
-  }
- // Save test data to the backend
- saveTestData(testId: string, score: string, status: string, completed: boolean): any {
-  console.log('saveTestData Called');
-  const currentAttemptNumber = this.dataStore['attempt_number'] || 0;
-  const data = {
-    name: 'Test Name',
-    attempt_number: currentAttemptNumber,
-    pass_status: status === 'passed',
-    suspend_data: JSON.stringify({ score: score }),
-    completed: completed
-  };
-
-  return this.saveTestResultToBackend(data, testId);
-}
 
 }
