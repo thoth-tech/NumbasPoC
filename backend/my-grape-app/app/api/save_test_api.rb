@@ -31,18 +31,42 @@ class SaveTestAPI < Grape::API
       render_success(tests, Entities::SaveTest)
     end
 
-    # Get latest test or create a default test and return this to front end.
-    desc 'Get the latest test result'
     get 'latest' do
-      test = SaveTest.order(id: :desc).first_or_create!(
+      # Try to find the latest test; if not found, initialize a new test without saving it
+      test = SaveTest.order(id: :desc).first_or_initialize(
         name: "Default Test", 
         attempt_number: 0, 
         pass_status: false, 
         suspend_data: "{}", 
-        completed: false
+        completed: false,
+        cmi_entry: 'ab-initio'  # set default value for new tests
       )
-      render_success(test, Entities::SaveTest)
+        
+      puts "Test attributes before update: #{test.attributes.inspect}"
+        
+      # If the test was just initialized and not persisted, save it
+      # Else, if the test is marked as completed, create a new test
+      # Else, update its cmi_entry to 'resume' and increment its attempt_number
+      if test.new_record?
+        test.save!
+      elsif test.completed
+        test = SaveTest.create!(
+          name: "Default Test", 
+          attempt_number: 0, 
+          pass_status: false, 
+          suspend_data: "{}", 
+          completed: false,
+          cmi_entry: 'ab-initio'
+        )
+      else
+        test.increment(:attempt_number).update(cmi_entry: 'resume')
+      end
+        
+      puts "Test attributes after update: #{test.attributes.inspect}"
+        
+      present :data, test, with: Entities::SaveTest
     end
+    
     
     # Endpoint to retrieve a specific test result by its ID
     desc 'Get a specific test result'
@@ -61,6 +85,7 @@ class SaveTestAPI < Grape::API
       requires :pass_status, type: Boolean, desc: 'Pass status'
       requires :suspend_data, type: String, desc: 'Suspended data in JSON'
       requires :completed, type: Boolean, desc: 'Completion status'
+      optional :exam_result, type: String, desc: 'Exam result'
       optional :attempted_at, type: DateTime, desc: 'Timestamp of the test attempt'
     end
     post do
@@ -77,6 +102,7 @@ class SaveTestAPI < Grape::API
       optional :pass_status, type: Boolean, desc: 'Pass status'
       optional :suspend_data, type: String, desc: 'Suspended data in JSON'
       optional :completed, type: Boolean, desc: 'Completion status'
+      optional :exam_result, type: String, desc: 'Exam result'
       optional :attempted_at, type: DateTime, desc: 'Timestamp of the test attempt'
     end
     put ':id' do
@@ -99,15 +125,23 @@ class SaveTestAPI < Grape::API
       requires :suspend_data, type: String, desc: 'Suspended data in JSON'
     end
     put ':id/suspend' do
-      test = SaveTest.find(params[:id])
+      test = SaveTest.find_by(id: params[:id])
+    
+      # Handle case when test is not found
+      error!('Test not found', 404) unless test
+    
       begin
         # Ensure it's valid JSON
-        parsed_data = JSON.parse(params[:suspend_data])
-        test.update!(suspend_data: parsed_data)
-        test
+        test.update!(suspend_data: params[:suspend_data])
+        puts "Received suspend_data: #{params[:suspend_data]}"
+
+        { message: 'Suspend data updated successfully', test: test }
       rescue JSON::ParserError
         error!('Invalid JSON provided', 400)
+      rescue => e
+        error!(e.message, 500)
       end
     end
+    
   end
 end

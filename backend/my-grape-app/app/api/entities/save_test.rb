@@ -6,5 +6,7 @@ module Entities
     expose :pass_status
     expose :suspend_data
     expose :completed
+    expose :cmi_entry
+    expose :exam_result
   end
 end

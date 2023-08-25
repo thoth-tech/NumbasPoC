@@ -80,7 +80,7 @@ export class SaveTestService {
    * @param suspend_data - The new suspend data for the test result.
    * @returns An observable of the updated test result.
    */
-  updateSuspendData(id: string, suspend_data: any): Observable<any> {
+  updateSuspendData(id: number, suspend_data: any): Observable<any> {
     let jsonData: string;
 
     if (typeof suspend_data === 'string') {

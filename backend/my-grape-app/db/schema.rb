@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2023_08_01_223322) do
+ActiveRecord::Schema[7.0].define(version: 2023_08_25_224956) do
   create_table "save_tests", charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
     t.string "name"
     t.integer "attempt_number"
@@ -20,6 +20,8 @@ ActiveRecord::Schema[7.0].define(version: 2023_08_01_223322) do
     t.datetime "updated_at", null: false
     t.boolean "completed", default: false
     t.datetime "attempted_at"
+    t.string "cmi_entry", default: "ab-initio"
+    t.string "exam_result"
   end
 
 end
