@@ -7,4 +7,6 @@ export interface SaveTest {
   suspend_data: string;
   completed: boolean;
   attempted_at: string;
+  cmi_entry: string;
+  exam_result: string;
 }

@@ -9,7 +9,7 @@ gem "rails", "~> 7.0.4", ">= 7.0.4.3"
 # Use sqlite3 as the database for Active Record
 gem 'mysql2'
 
-
+gem 'grape-entity'
 # Use the Puma web server [https://github.com/puma/puma]
 gem "puma", "~> 5.0"
 gem 'rack-cors'
@@ -36,6 +36,7 @@ gem "bootsnap", require: false
 # gem "rack-cors"
 gem 'grape', '~> 1.5'
 gem 'rubyzip', '~> 2.3', '>= 2.3.2', require: 'zip'
+
 
 gem 'mime-types', '~> 3.3'
 group :development, :test do
