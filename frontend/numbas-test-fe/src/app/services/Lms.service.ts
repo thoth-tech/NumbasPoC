@@ -115,13 +115,15 @@ export class LmsService {
       suspend_data: JSON.stringify(this.dataStore),
       completed: true,
       // Save the examResult directly in the DB
-      examResult: examResult
+      exam_result: examResult
     };
 
     const xhr = new XMLHttpRequest();
     if (this.testId) {
+      console.log("saving with test ID : " + this.testId);
       xhr.open("PUT", `http://localhost:3000/api/savetest/savetests/${this.testId}`, false);
     } else {
+      console.log("saving without test ID for some reason.")
       xhr.open("POST", "http://localhost:3000/api/savetest/savetests", false);
     }
     xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
@@ -134,9 +136,6 @@ export class LmsService {
     this.resetDataStore();
     return 'true';
   }
-
-
-
 
   // Get a value from the dataStore or return a default value
   GetValue(element: string): string {
@@ -167,26 +166,26 @@ export class LmsService {
 
   private isCommitCalled = false;
 
- // Commit the current state of the test to the backend
- Commit(): string {
-  if (!this.initializationComplete$.getValue()) {
-    console.warn('Initialization not complete. Cannot commit.');
-    return 'false';
-  }
-  const suspendDataString = JSON.stringify(this.dataStore);
-  console.log(suspendDataString);
-  console.log(this.testId);
-  this.updateSuspendData(this.testId, suspendDataString).subscribe(
-    () => {
-      console.log('Suspend data saved successfully.');
-    },
-    (error) => {
-      console.error('Error saving suspend data:', error);
+  Commit(): string {
+    if (!this.initializationComplete$.getValue()) {
+      console.warn('Initialization not complete. Cannot commit.');
+      return 'false';
     }
-  );
+    const suspendDataString = JSON.stringify(this.dataStore);
+    console.log(suspendDataString);
+    console.log(this.testId);
 
-  return 'true';
-}
+    this.saveTestService.updateSuspendData(this.testId, suspendDataString)
+      .then(() => {
+        console.log('Suspend data saved successfully.');
+      })
+      .catch((error) => {
+        console.error('Error saving suspend data:', error);
+      });
+
+    return 'true';
+  }
+
 
 
   // Placeholder methods for SCORM error handling
@@ -203,33 +202,4 @@ export class LmsService {
     //console.log('Get Diagnoistic called');
     return '';
   }
-  /**
-   * Updates the suspend data for a specific test result.
-   * @param id - The ID of the test result to update.
-   * @param suspend_data - The new suspend data for the test result.
-   * @returns An observable of the updated test result.
-   */
-  updateSuspendData(id: number, suspend_data: any): Observable<any> {
-    let jsonData: string;
-
-    if (typeof suspend_data === 'string') {
-      try {
-        // Try to parse it to ensure it's valid JSON
-        JSON.parse(suspend_data);
-        jsonData = suspend_data;
-      } catch (e) {
-        return throwError('Provided string is not valid JSON');
-      }
-    } else {
-      // If it's not a string, try to stringify it
-      try {
-        jsonData = JSON.stringify(suspend_data);
-      } catch (e) {
-        return throwError('Failed to stringify provided data');
-      }
-    }
-
-    return this.http.put(`${this.apiBaseUrl}/${id}/suspend`, { suspend_data: jsonData });
-  }
-
 }

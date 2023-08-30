@@ -74,34 +74,31 @@ export class SaveTestService {
     );
   }
 
-  /**
-   * Updates the suspend data for a specific test result.
-   * @param id - The ID of the test result to update.
-   * @param suspend_data - The new suspend data for the test result.
-   * @returns An observable of the updated test result.
-   */
-  updateSuspendData(id: number, suspend_data: any): Observable<any> {
+  updateSuspendData(id: number | string, suspend_data: any): Promise<any> {
     let jsonData: string;
 
     if (typeof suspend_data === 'string') {
-      try {
-        // Try to parse it to ensure it's valid JSON
-        JSON.parse(suspend_data);
-        jsonData = suspend_data;
-      } catch (e) {
-        return throwError('Provided string is not valid JSON');
-      }
+        try {
+            // Try to parse it to ensure it's valid JSON
+            JSON.parse(suspend_data);
+            jsonData = suspend_data;
+        } catch (e) {
+            return Promise.reject('Provided string is not valid JSON');
+        }
     } else {
-      // If it's not a string, try to stringify it
-      try {
-        jsonData = JSON.stringify(suspend_data);
-      } catch (e) {
-        return throwError('Failed to stringify provided data');
-      }
+        // If it's not a string, try to stringify it
+        try {
+            jsonData = JSON.stringify(suspend_data);
+        } catch (e) {
+            return Promise.reject('Failed to stringify provided data');
+        }
     }
 
-    return this.http.put(`${this.apiBaseUrl}/${id}/suspend`, { suspend_data: jsonData });
+    return this.http.put(`${this.apiBaseUrl}/${id}/suspend`, jsonData, {
+        headers: { 'Content-Type': 'application/json' }
+    }).toPromise();
   }
+
 
 
   /**
