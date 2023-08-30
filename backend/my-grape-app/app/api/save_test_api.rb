@@ -31,42 +31,47 @@ class SaveTestAPI < Grape::API
       render_success(tests, Entities::SaveTest)
     end
 
+    # Endpoint to retrieve the latest test result or create one if necessary
     get 'latest' do
-      # Try to find the latest test; if not found, initialize a new test without saving it
-      test = SaveTest.order(id: :desc).first_or_initialize(
-        name: "Default Test", 
-        attempt_number: 0, 
-        pass_status: false, 
-        suspend_data: "{}", 
-        completed: false,
-        cmi_entry: 'ab-initio'  # set default value for new tests
-      )
-        
-      puts "Test attributes before update: #{test.attributes.inspect}"
-        
-      # If the test was just initialized and not persisted, save it
-      # Else, if the test is marked as completed, create a new test
-      # Else, update its cmi_entry to 'resume' and increment its attempt_number
-      if test.new_record?
-        test.save!
+      test = SaveTest.order(id: :desc).first
+
+      if test.nil?
+        test = SaveTest.create!(
+          name: "Default Test",
+          attempt_number: 1,
+          pass_status: false,
+          suspend_data: "{}",
+          completed: false,
+          cmi_entry: 'ab-initio'
+        )
       elsif test.completed
         test = SaveTest.create!(
-          name: "Default Test", 
-          attempt_number: 0, 
-          pass_status: false, 
-          suspend_data: "{}", 
+          name: "Default Test",
+          attempt_number: test.attempt_number + 1,
+          pass_status: false,
+          suspend_data: "{}",
           completed: false,
           cmi_entry: 'ab-initio'
         )
       else
-        test.increment(:attempt_number).update(cmi_entry: 'resume')
+        test.update!(cmi_entry: 'resume')
       end
-        
+
       puts "Test attributes after update: #{test.attributes.inspect}"
-        
       present :data, test, with: Entities::SaveTest
     end
     
+    # Endpoint to retrieve the latest completed test
+    desc 'Get the latest completed test result'
+    get 'completed-latest' do
+      test = SaveTest.where(completed: true).order(id: :desc).first
+
+      if test.nil?
+        error!({ message: 'No completed tests found' }, 404)
+      else
+        render_success(test, Entities::SaveTest)
+      end
+    end
     
     # Endpoint to retrieve a specific test result by its ID
     desc 'Get a specific test result'
@@ -126,15 +131,13 @@ class SaveTestAPI < Grape::API
     end
     put ':id/suspend' do
       test = SaveTest.find_by(id: params[:id])
-    
-      # Handle case when test is not found
+
       error!('Test not found', 404) unless test
-    
+
       begin
-        # Ensure it's valid JSON
+        JSON.parse(params[:suspend_data])
         test.update!(suspend_data: params[:suspend_data])
         puts "Received suspend_data: #{params[:suspend_data]}"
-
         { message: 'Suspend data updated successfully', test: test }
       rescue JSON::ParserError
         error!('Invalid JSON provided', 400)
@@ -142,6 +145,5 @@ class SaveTestAPI < Grape::API
         error!(e.message, 500)
       end
     end
-    
   end
 end
