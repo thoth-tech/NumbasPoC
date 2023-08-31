@@ -52,10 +52,44 @@ export class LmsService {
     };
   }
 
-  Initialize(): string {
+  Initialize(mode: 'attempt' | 'review' = 'attempt'): string {
     console.log('Initialize() function called');
+
     const studentId = 123456;
-    const xhr = new XMLHttpRequest();
+    let xhr = new XMLHttpRequest();
+    if (mode === 'review') {
+      this.dataStore['cmi.mode'] = 'review';
+
+      xhr.open("GET", `${this.apiBaseUrl}/completed-latest`, false);
+      xhr.send();
+      console.log(xhr.responseText);
+
+      if (xhr.status !== 200) {
+          console.error('Error fetching latest completed test result:', xhr.statusText);
+          return 'false';
+      }
+
+      try {
+          const completedTest = JSON.parse(xhr.responseText);
+
+          // Parse suspend_data and merge it into dataStore
+          const parsedSuspendData = JSON.parse(completedTest.data.suspend_data || '{}');
+          this.dataStore = {
+              ...this.dataStore,
+              ...parsedSuspendData
+          };
+
+          this.dataStore['cmi.entry'] = 'RO';
+          this.dataStore['cmi.mode'] = 'review';
+
+          console.log('Latest completed test data:', completedTest);
+          return 'true';
+
+      } catch (error) {
+          console.error('Error:', error);
+          return 'false';
+      }
+  }
     xhr.open("GET", `${this.apiBaseUrl}/latest`, false);
     xhr.send();
     console.log(xhr.responseText);
@@ -67,33 +101,33 @@ export class LmsService {
 
     let latestTest;
     try {
-      latestTest = JSON.parse(xhr.responseText);
-      console.log('Latest test result:', latestTest);
-      this.testId = latestTest.data.id;
+        latestTest = JSON.parse(xhr.responseText);
+        console.log('Latest test result:', latestTest);
+        this.testId = latestTest.data.id;
 
-      if (latestTest.data['cmi_entry'] === 'ab-initio') {
-        // When starting a new test, the dataStore should use the default values
-        this.dataStore = {
-          ...this.dataStore};// = this.getDefaultDataStore();
-        this.dataStore['cmi.entry'] = 'ab-initio'
+        if (latestTest.data['cmi_entry'] === 'ab-initio') {
+            // When starting a new test, the dataStore should use the default values
+            this.dataStore = this.getDefaultDataStore();
+            this.dataStore['cmi.entry'] = 'ab-initio'
+        } else if (latestTest.data['cmi_entry'] === 'resume') {
+            const parsedSuspendData = JSON.parse(latestTest.data.suspend_data || '{}');
+            this.dataStore = {
+                ...this.dataStore,
+                ...parsedSuspendData
+            };
 
-      } else if (latestTest.data['cmi_entry'] === 'resume') {
-        const parsedSuspendData = JSON.parse(latestTest.data.suspend_data || '{}');
-        this.dataStore = {
-          ...this.dataStore,
-          ...parsedSuspendData
-        };
-        console.log(parsedSuspendData);
-        this.dataStore['cmi.completion_status'] = 'incomplete';
-        this.dataStore['cmi.entry'] = 'resume';
-      }
-      this.initializationComplete$.next(true);
-      return 'true';
+            console.log(parsedSuspendData);
+            this.dataStore['cmi.completion_status'] = 'incomplete';
+            this.dataStore['cmi.entry'] = 'resume';
+        }
+
+        this.initializationComplete$.next(true);
+        return 'true';
     } catch (error) {
-      console.error('Error:', error);
-      return 'false';
+        console.error('Error:', error);
+        return 'false';
     }
-  }
+}
 
   isTestCompleted(): boolean {
     return this.dataStore?.['completed'] || false;
@@ -146,32 +180,36 @@ export class LmsService {
     }
     return 'true';
   }
+//function to save the state of the exam.
+Commit(): string {
+  if (!this.initializationComplete$.getValue()) {
+      console.warn('Initialization not complete. Cannot commit.');
+      return 'false';
+  }
 
-  Commit(): string {
-    if (!this.initializationComplete$.getValue()) {
-        console.warn('Initialization not complete. Cannot commit.');
-        return 'false';
-    }
+  // Set cmi.entry to 'resume' before committing dataStore
+  this.dataStore['cmi.entry'] = 'resume';
 
-    let jsonData: string;
-    const suspendDataString = JSON.stringify(this.dataStore);
+  console.log("Committing dataStore:", this.dataStore);
+  const suspendDataString = JSON.stringify(this.dataStore);
 
-    if (typeof suspendDataString === 'string') {
-        try {
-            JSON.parse(suspendDataString);
-            jsonData = suspendDataString;
-        } catch (e) {
-            console.error('Provided string is not valid JSON:', e);
-            return 'false';
-        }
-    } else {
-        try {
-            jsonData = JSON.stringify(suspendDataString);
-        } catch (e) {
-            console.error('Failed to stringify provided data:', e);
-            return 'false';
-        }
-    }
+  let jsonData: string;
+  if (typeof suspendDataString === 'string') {
+      try {
+          JSON.parse(suspendDataString);
+          jsonData = suspendDataString;
+      } catch (e) {
+          console.error('Provided string is not valid JSON:', e);
+          return 'false';
+      }
+  } else {
+      try {
+          jsonData = JSON.stringify(suspendDataString);
+      } catch (e) {
+          console.error('Failed to stringify provided data:', e);
+          return 'false';
+      }
+  }
     // Use XHR to send the request
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', `${this.apiBaseUrl}/${this.testId}/suspend`, true);

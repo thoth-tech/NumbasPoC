@@ -12,6 +12,7 @@ declare global {
   templateUrl: './numbas-component.component.html'
 })
 export class NumbasComponent implements OnInit {
+  currentMode: 'attempt' | 'review' = 'attempt';
   constructor(
     private numbasService: NumbasService,
     private lmsService: LmsService
@@ -21,7 +22,7 @@ export class NumbasComponent implements OnInit {
     this.interceptIframeRequests();
 
     window.API_1484_11 =  {
-      Initialize: () => this.lmsService.Initialize(),
+      Initialize: () => this.lmsService.Initialize(this.currentMode),
       Terminate: () => this.lmsService.Terminate(),
       GetValue: (element: string) => this.lmsService.GetValue(element),
       SetValue: (element: string, value: string) => this.lmsService.SetValue(element, value),
@@ -32,7 +33,8 @@ export class NumbasComponent implements OnInit {
     };
   }
 
-  launchNumbasTest(): void {
+  launchNumbasTest(mode: 'attempt' | 'review' = 'attempt'): void {
+    this.currentMode = mode;
     const iframe = document.createElement('iframe');
     iframe.src = 'http://localhost:4201/api/numbas_api/index.html';
     iframe.style.width = '100%';
@@ -40,7 +42,7 @@ export class NumbasComponent implements OnInit {
     document.body.appendChild(iframe);
   }
   setReviewMode(): void {
-
+    this.reviewTest();
   }
 
   removeNumbasTest(): void {
@@ -48,8 +50,7 @@ export class NumbasComponent implements OnInit {
     iframe?.parentNode?.removeChild(iframe);
   }
   reviewTest(): void {
-      this.setReviewMode();
-      this.launchNumbasTest();
+    this.launchNumbasTest('review');
   }
 
   interceptIframeRequests(): void {
