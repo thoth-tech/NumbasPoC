@@ -39,10 +39,17 @@ export class NumbasComponent implements OnInit {
     iframe.style.height = '800px';
     document.body.appendChild(iframe);
   }
+  setReviewMode(): void {
+
+  }
 
   removeNumbasTest(): void {
     const iframe = document.getElementsByTagName('iframe')[0];
     iframe?.parentNode?.removeChild(iframe);
+  }
+  reviewTest(): void {
+      this.setReviewMode();
+      this.launchNumbasTest();
   }
 
   interceptIframeRequests(): void {

@@ -10,10 +10,10 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2023_08_25_224956) do
+ActiveRecord::Schema[7.0].define(version: 2023_08_31_002938) do
   create_table "save_tests", charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
     t.string "name"
-    t.integer "attempt_number"
+    t.integer "attempt_number", default: 1, null: false
     t.boolean "pass_status"
     t.text "suspend_data"
     t.datetime "created_at", null: false
