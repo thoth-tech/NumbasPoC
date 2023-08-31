@@ -40,7 +40,7 @@ class SaveTestAPI < Grape::API
           name: "Default Test",
           attempt_number: 1,
           pass_status: false,
-          suspend_data: "{}",
+          suspend_data: nil,
           completed: false,
           cmi_entry: 'ab-initio'
         )
@@ -49,7 +49,7 @@ class SaveTestAPI < Grape::API
           name: "Default Test",
           attempt_number: test.attempt_number + 1,
           pass_status: false,
-          suspend_data: "{}",
+          suspend_data: nil,
           completed: false,
           cmi_entry: 'ab-initio'
         )
@@ -123,21 +123,24 @@ class SaveTestAPI < Grape::API
       SaveTest.find(params[:id]).destroy!
     end
 
-    # Endpoint to update the suspend data for a specific test result by its ID
     desc 'Update suspend data for a test result'
     params do
       requires :id, type: String, desc: 'ID of the test'
-      requires :suspend_data, type: String, desc: 'Suspended data in JSON'
     end
     put ':id/suspend' do
       test = SaveTest.find_by(id: params[:id])
-
+    
       error!('Test not found', 404) unless test
-
+    
+      # Extract the nested suspend_data
+      suspend_data = params['cmi.suspend_data']
+    
+      # Log the exact contents
+      puts "Raw suspend_data: #{suspend_data.inspect}"
+    
       begin
-        JSON.parse(params[:suspend_data])
-        test.update!(suspend_data: params[:suspend_data])
-        puts "Received suspend_data: #{params[:suspend_data]}"
+        JSON.parse(suspend_data)
+        test.update!(suspend_data: suspend_data)
         { message: 'Suspend data updated successfully', test: test }
       rescue JSON::ParserError
         error!('Invalid JSON provided', 400)
@@ -145,5 +148,6 @@ class SaveTestAPI < Grape::API
         error!(e.message, 500)
       end
     end
+    
   end
 end

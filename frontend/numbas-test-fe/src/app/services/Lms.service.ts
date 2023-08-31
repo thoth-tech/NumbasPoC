@@ -1,6 +1,5 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { SaveTestService } from './savetest.service';
 import { BehaviorSubject, Observable, throwError } from 'rxjs';
 
 declare let pipwerks: any;
@@ -9,41 +8,89 @@ declare let pipwerks: any;
   providedIn: 'root'
 })
 export class LmsService {
-  // Default values for the dataStore
-  private defaultDataStore = {
-    testId: null,
-    name: null,
-    attempt_number: 0,
-    pass_status: false,
-    suspend_data: '{}',
-    completed: false,
-    'cmi.entry': 'ab-initio',
-    'cmi.completion_status': 'not attempted',
-    'cmi.learner_id': null
-  };
-  // Base URL for the API endpoint
+
   private apiBaseUrl = 'http://localhost:3000/api/savetest/savetests';
-  // The main data store that holds the current state of the test
-  dataStore: { [key: string]: any } = { ...this.defaultDataStore };
-  private testId: number =0;
-  // Observable to track if initialization is complete
+
+  private defaultValues: { [key: string]: string } = {
+    'cmi.completion_status': 'not attempted',
+    'cmi.entry': 'resume',
+    'cmi.objectives._count': '0',
+    'cmi.interactions._count': '0',
+    'numbas.user_role': 'learner',
+    'numbas.duration_extension.amount': '0',
+    'numbas.duration_extension.units': 'seconds',
+    'cmi.mode': 'normal'
+  };
+
+  private testId: number = 0;
+
   initializationComplete$ = new BehaviorSubject<boolean>(false);
 
-  constructor(private http: HttpClient, private saveTestService: SaveTestService) {
-    // Set the SCORM version
+  private scormErrors: { [key: string]: string } = {
+    "0": "No error",
+    "101": "General exception",
+  };
+
+  dataStore: { [key: string]: any } = this.getDefaultDataStore();
+
+  constructor(private http: HttpClient) {
     pipwerks.SCORM.version = "2004";
     console.log(`SCORM version is set to: ${pipwerks.SCORM.version}`);
   }
 
-  Initialize(): string {
+  getDefaultDataStore() {
+    // Use spread operator to merge defaultValues into the dataStore
+    return {
+      ...this.defaultValues,
+      testId: null,
+      name: null,
+      attempt_number: 0,
+      pass_status: false,
+      suspend_data: '{}',
+      completed: false,
+      'cmi.learner_id': null
+    };
+  }
+
+  Initialize(mode: 'attempt' | 'review' = 'attempt'): string {
     console.log('Initialize() function called');
 
-    // In Ontrack this would be set by the logged in students ID
     const studentId = 123456;
+    let xhr = new XMLHttpRequest();
+    if (mode === 'review') {
+      this.dataStore['cmi.mode'] = 'review';
 
-    // Fetch the latest test using synchronous XMLHttpRequest
-    const xhr = new XMLHttpRequest();
-    xhr.open("GET", "http://localhost:3000/api/savetest/savetests/latest", false);
+      xhr.open("GET", `${this.apiBaseUrl}/completed-latest`, false);
+      xhr.send();
+      console.log(xhr.responseText);
+
+      if (xhr.status !== 200) {
+          console.error('Error fetching latest completed test result:', xhr.statusText);
+          return 'false';
+      }
+
+      try {
+          const completedTest = JSON.parse(xhr.responseText);
+
+          // Parse suspend_data and merge it into dataStore
+          const parsedSuspendData = JSON.parse(completedTest.data.suspend_data || '{}');
+          this.dataStore = {
+              ...this.dataStore,
+              ...parsedSuspendData
+          };
+
+          this.dataStore['cmi.entry'] = 'RO';
+          this.dataStore['cmi.mode'] = 'review';
+
+          console.log('Latest completed test data:', completedTest);
+          return 'true';
+
+      } catch (error) {
+          console.error('Error:', error);
+          return 'false';
+      }
+  }
+    xhr.open("GET", `${this.apiBaseUrl}/latest`, false);
     xhr.send();
     console.log(xhr.responseText);
 
@@ -52,79 +99,65 @@ export class LmsService {
       return 'false';
     }
 
-    // Ensure the response is valid JSON before parsing
     let latestTest;
     try {
-      latestTest = JSON.parse(xhr.responseText);
-      console.log('Latest test result:', latestTest);
+        latestTest = JSON.parse(xhr.responseText);
+        console.log('Latest test result:', latestTest);
+        this.testId = latestTest.data.id;
 
-      // Store the testId as a local variable
-      this.testId = latestTest.data.id;
-      // Always reset to defaults first.
-      //this.resetDataStore();
-      console.log(this.testId);
-      console.log("Handling the test");
-      console.log(latestTest.data['cmi_entry']);
-      if (latestTest.data['cmi_entry'] === 'ab-initio') {
-        this.dataStore['cmi.entry'] = 'ab-initio';
-      } else if (latestTest.data['cmi_entry'] === 'resume') {
-        const parsedSuspendData = JSON.parse(latestTest.data.suspend_data || '{}');
-        this.dataStore = {
-          ...this.dataStore,
-          ...parsedSuspendData
-        };
-        console.log(parsedSuspendData);
-        this.dataStore['cmi.completion_status'] = 'incomplete';
-        this.dataStore['cmi.entry'] = 'resume';
-      }
-      console.log(`Handling Test ID: ${this.testId} with data:`, this.dataStore);
+        if (latestTest.data['cmi_entry'] === 'ab-initio') {
+            // When starting a new test, the dataStore should use the default values
+            this.dataStore = this.getDefaultDataStore();
+            this.dataStore['cmi.entry'] = 'ab-initio'
+        } else if (latestTest.data['cmi_entry'] === 'resume') {
+            const parsedSuspendData = JSON.parse(latestTest.data.suspend_data || '{}');
+            this.dataStore = {
+                ...this.dataStore,
+                ...parsedSuspendData
+            };
 
-      this.initializationComplete$.next(true);
-      return 'true';
+            console.log(parsedSuspendData);
+            this.dataStore['cmi.completion_status'] = 'incomplete';
+            this.dataStore['cmi.entry'] = 'resume';
+        }
+
+        this.initializationComplete$.next(true);
+        return 'true';
     } catch (error) {
-      console.error('Error:', error);
-      return 'false';
+        console.error('Error:', error);
+        return 'false';
     }
-  }
+}
 
-  // Check if the test is completed
   isTestCompleted(): boolean {
     return this.dataStore?.['completed'] || false;
   }
-  // Reset the dataStore to its default state
+
   private resetDataStore() {
-    this.dataStore = { ...this.defaultDataStore };
+    this.dataStore = this.getDefaultDataStore();
   }
 
   Terminate(): string {
     console.log('Terminate Called');
-
     const examResult = this.dataStore["cmi.score.raw"];
     const status = this.GetValue("cmi.completion_status");
-
-    // Mark the test as completed
     this.dataStore['completed'] = true;
-
     const currentAttemptNumber = this.dataStore['attempt_number'] || 0;
 
     const data = {
       name: 'Test Name',
       attempt_number: currentAttemptNumber,
       pass_status: status === 'passed',
-      // Save the entire dataStore as suspend_data
       suspend_data: JSON.stringify(this.dataStore),
       completed: true,
-      // Save the examResult directly in the DB
       exam_result: examResult
     };
 
     const xhr = new XMLHttpRequest();
     if (this.testId) {
-      console.log("saving with test ID : " + this.testId);
-      xhr.open("PUT", `http://localhost:3000/api/savetest/savetests/${this.testId}`, false);
+      xhr.open("PUT", `${this.apiBaseUrl}/${this.testId}`, false);
     } else {
-      console.log("saving without test ID for some reason.")
-      xhr.open("POST", "http://localhost:3000/api/savetest/savetests", false);
+      xhr.open("POST", this.apiBaseUrl, false);
     }
     xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
     xhr.send(JSON.stringify(data));
@@ -137,57 +170,67 @@ export class LmsService {
     return 'true';
   }
 
-  // Get a value from the dataStore or return a default value
   GetValue(element: string): string {
-    console.log('API.GetValue()', element);
-
-    // Default values for specific SCORM elements
-    const defaultValues: { [key: string]: string } = {
-        'cmi.completion_status': 'not attempted',
-        'cmi.entry': 'resume',
-        'cmi.objectives._count': '0',
-        'cmi.interactions._count': '0',
-        'numbas.user_role': 'learner',
-        'numbas.duration_extension.amount': '0',
-        'numbas.duration_extension.units': 'seconds',
-        'cmi.mode': 'normal'
-    };
-
-    return this.dataStore[element] || defaultValues[element] || '';
+    return this.dataStore[element] || this.defaultValues[element] || '';
   }
 
-  // Set a value in the dataStore
   SetValue(element: string, value: any): string {
     if (element.startsWith('cmi.')) {
       this.dataStore[element] = value;
     }
     return 'true';
   }
-
-  private isCommitCalled = false;
-
-  Commit(): string {
-    if (!this.initializationComplete$.getValue()) {
+//function to save the state of the exam.
+Commit(): string {
+  if (!this.initializationComplete$.getValue()) {
       console.warn('Initialization not complete. Cannot commit.');
       return 'false';
-    }
-    const suspendDataString = JSON.stringify(this.dataStore);
-    console.log(suspendDataString);
-    console.log(this.testId);
-
-    this.saveTestService.updateSuspendData(this.testId, suspendDataString)
-      .then(() => {
-        console.log('Suspend data saved successfully.');
-      })
-      .catch((error) => {
-        console.error('Error saving suspend data:', error);
-      });
-
-    return 'true';
   }
 
+  // Set cmi.entry to 'resume' before committing dataStore
+  this.dataStore['cmi.entry'] = 'resume';
 
+  console.log("Committing dataStore:", this.dataStore);
+  const suspendDataString = JSON.stringify(this.dataStore);
 
+  let jsonData: string;
+  if (typeof suspendDataString === 'string') {
+      try {
+          JSON.parse(suspendDataString);
+          jsonData = suspendDataString;
+      } catch (e) {
+          console.error('Provided string is not valid JSON:', e);
+          return 'false';
+      }
+  } else {
+      try {
+          jsonData = JSON.stringify(suspendDataString);
+      } catch (e) {
+          console.error('Failed to stringify provided data:', e);
+          return 'false';
+      }
+  }
+    // Use XHR to send the request
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', `${this.apiBaseUrl}/${this.testId}/suspend`, true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+
+    xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 400) {
+            console.log('Suspend data saved successfully.');
+        } else {
+            console.error('Error saving suspend data:', xhr.responseText);
+        }
+    };
+
+    xhr.onerror = () => {
+        console.error('Request failed.');
+    };
+
+    xhr.send(jsonData);
+
+    return 'true';
+}
   // Placeholder methods for SCORM error handling
   GetLastError(): string {
     //console.log('Get Last Error called');
