@@ -58,7 +58,7 @@ export class LmsService {
     const studentId = 123456;
     let xhr = new XMLHttpRequest();
     if (mode === 'review') {
-      this.dataStore['cmi.mode'] = 'review';
+      this.SetValue('cmi.mode', 'review');
 
       xhr.open("GET", `${this.apiBaseUrl}/completed-latest`, false);
       xhr.send();
@@ -71,16 +71,15 @@ export class LmsService {
 
       try {
           const completedTest = JSON.parse(xhr.responseText);
-
-          // Parse suspend_data and merge it into dataStore
           const parsedSuspendData = JSON.parse(completedTest.data.suspend_data || '{}');
-          this.dataStore = {
-              ...this.dataStore,
-              ...parsedSuspendData
-          };
 
-          this.dataStore['cmi.entry'] = 'RO';
-          this.dataStore['cmi.mode'] = 'review';
+          // Use SetValue to set parsedSuspendData values to dataStore
+          Object.keys(parsedSuspendData).forEach(key => {
+            this.SetValue(key, parsedSuspendData[key]);
+          });
+
+          this.SetValue('cmi.entry', 'RO');
+          this.SetValue('cmi.mode', 'review');
 
           console.log('Latest completed test data:', completedTest);
           return 'true';
@@ -89,7 +88,7 @@ export class LmsService {
           console.error('Error:', error);
           return 'false';
       }
-  }
+    }
     xhr.open("GET", `${this.apiBaseUrl}/latest`, false);
     xhr.send();
     console.log(xhr.responseText);
@@ -106,19 +105,19 @@ export class LmsService {
         this.testId = latestTest.data.id;
 
         if (latestTest.data['cmi_entry'] === 'ab-initio') {
-            // When starting a new test, the dataStore should use the default values
             this.dataStore = this.getDefaultDataStore();
-            this.dataStore['cmi.entry'] = 'ab-initio'
+            this.SetValue('cmi.entry', 'ab-initio');
+            console.log(this.dataStore);
         } else if (latestTest.data['cmi_entry'] === 'resume') {
             const parsedSuspendData = JSON.parse(latestTest.data.suspend_data || '{}');
-            this.dataStore = {
-                ...this.dataStore,
-                ...parsedSuspendData
-            };
 
-            console.log(parsedSuspendData);
-            this.dataStore['cmi.completion_status'] = 'incomplete';
-            this.dataStore['cmi.entry'] = 'resume';
+            // Use SetValue to set parsedSuspendData values to dataStore
+            Object.keys(parsedSuspendData).forEach(key => {
+              this.SetValue(key, parsedSuspendData[key]);
+            });
+
+            this.SetValue('cmi.completion_status', 'incomplete');
+            this.SetValue('cmi.entry', 'resume');
         }
 
         this.initializationComplete$.next(true);
@@ -128,6 +127,7 @@ export class LmsService {
         return 'false';
     }
 }
+
 
   isTestCompleted(): boolean {
     return this.dataStore?.['completed'] || false;
