@@ -129,17 +129,17 @@ class SaveTestAPI < Grape::API
     end
     put ':id/suspend' do
       test = SaveTest.find_by(id: params[:id])
-    
+      
       error!('Test not found', 404) unless test
-    
-      # Extract the nested suspend_data
-      suspend_data = params['cmi.suspend_data']
+      
+      # Treat the entire params as the data to be saved
+      suspend_data = params.to_json
     
       # Log the exact contents
       puts "Raw suspend_data: #{suspend_data.inspect}"
-    
+      
       begin
-        JSON.parse(suspend_data)
+        JSON.parse(suspend_data) 
         test.update!(suspend_data: suspend_data)
         { message: 'Suspend data updated successfully', test: test }
       rescue JSON::ParserError

@@ -11,16 +11,16 @@ export class LmsService {
 
   private apiBaseUrl = 'http://localhost:3000/api/savetest/savetests';
 
-  private defaultValues: { [key: string]: string } = {
-    'cmi.completion_status': 'not attempted',
-    'cmi.entry': 'resume',
-    'cmi.objectives._count': '0',
-    'cmi.interactions._count': '0',
-    'numbas.user_role': 'learner',
-    'numbas.duration_extension.amount': '0',
-    'numbas.duration_extension.units': 'seconds',
-    'cmi.mode': 'normal'
-  };
+  // private defaultValues: { [key: string]: string } = {
+  //   'cmi.completion_status': 'not attempted',
+  //   'cmi.entry': 'resume',
+  //   'cmi.objectives._count': '0',
+  //   'cmi.interactions._count': '0',
+  //   'numbas.user_role': 'learner',
+  //   'numbas.duration_extension.amount': '0',
+  //   'numbas.duration_extension.units': 'seconds',
+  //   'cmi.mode': 'normal'
+  // };
 
   private testId: number = 0;
 
@@ -41,14 +41,12 @@ export class LmsService {
   getDefaultDataStore() {
     // Use spread operator to merge defaultValues into the dataStore
     return {
-      ...this.defaultValues,
+      // ...this.defaultValues,
       testId: null,
       name: null,
       attempt_number: 0,
       pass_status: false,
-      suspend_data: '{}',
       completed: false,
-      'cmi.learner_id': null
     };
   }
 
@@ -58,7 +56,7 @@ export class LmsService {
     const studentId = 123456;
     let xhr = new XMLHttpRequest();
     if (mode === 'review') {
-      this.dataStore['cmi.mode'] = 'review';
+      this.SetValue('cmi.mode', 'review');
 
       xhr.open("GET", `${this.apiBaseUrl}/completed-latest`, false);
       xhr.send();
@@ -71,16 +69,18 @@ export class LmsService {
 
       try {
           const completedTest = JSON.parse(xhr.responseText);
-
-          // Parse suspend_data and merge it into dataStore
           const parsedSuspendData = JSON.parse(completedTest.data.suspend_data || '{}');
-          this.dataStore = {
-              ...this.dataStore,
-              ...parsedSuspendData
-          };
 
-          this.dataStore['cmi.entry'] = 'RO';
-          this.dataStore['cmi.mode'] = 'review';
+          // Set entire suspendData string to cmi.suspend_data
+          this.SetValue('cmi.suspend_data', JSON.stringify(parsedSuspendData));
+
+          // Use SetValue to set parsedSuspendData values to dataStore
+          Object.keys(parsedSuspendData).forEach(key => {
+            this.SetValue(key, parsedSuspendData[key]);
+          });
+
+          this.SetValue('cmi.entry', 'RO');
+          this.SetValue('cmi.mode', 'review');
 
           console.log('Latest completed test data:', completedTest);
           return 'true';
@@ -89,7 +89,8 @@ export class LmsService {
           console.error('Error:', error);
           return 'false';
       }
-  }
+    }
+
     xhr.open("GET", `${this.apiBaseUrl}/latest`, false);
     xhr.send();
     console.log(xhr.responseText);
@@ -106,28 +107,50 @@ export class LmsService {
         this.testId = latestTest.data.id;
 
         if (latestTest.data['cmi_entry'] === 'ab-initio') {
-            // When starting a new test, the dataStore should use the default values
+          console.log("starting new test");
             this.dataStore = this.getDefaultDataStore();
-            this.dataStore['cmi.entry'] = 'ab-initio'
-        } else if (latestTest.data['cmi_entry'] === 'resume') {
+            this.SetValue('cmi.entry', 'ab-initio');
+            this.SetValue('cmi.learner_id', studentId);
+            console.log(this.dataStore);
+      } else if (latestTest.data['cmi_entry'] === 'resume') {
+            console.log("resuming test");
             const parsedSuspendData = JSON.parse(latestTest.data.suspend_data || '{}');
-            this.dataStore = {
-                ...this.dataStore,
-                ...parsedSuspendData
-            };
 
-            console.log(parsedSuspendData);
-            this.dataStore['cmi.completion_status'] = 'incomplete';
-            this.dataStore['cmi.entry'] = 'resume';
+            this.dataStore = JSON.parse(JSON.stringify(parsedSuspendData));
+
+            console.log(this.dataStore);
+
+
+
+            // Set the suspend_data value as the value for cmi.suspend_data in your datastore
+            //this.SetValue('cmi.suspend_data', latestTest.data.suspend_data || '{}');
+            //this.SetValue('cmi.entry', 'resume');
+            // Setting cmi.location if available in suspend_data
+            // if (parsedSuspendData['cmi.location']) {
+            //   this.SetValue('cmi.location', parsedSuspendData['cmi.location']);
+            // }
+            // this.SetValue('cmi.entry', 'resume');
+            // this.SetValue('cmi.completion_status', 'incomplete');
+            // // Set entire suspendData string to cmi.suspend_data
+            // this.SetValue('cmi.suspend_data', JSON.stringify(parsedSuspendData));
+
+            // // Use SetValue to set parsedSuspendData values to dataStore
+            // Object.keys(parsedSuspendData).forEach(key => {
+            //   this.SetValue(key, parsedSuspendData[key]);
+            // });
+            // console.log(this.dataStore);
         }
 
         this.initializationComplete$.next(true);
+        console.log("finished initlizing");
         return 'true';
     } catch (error) {
         console.error('Error:', error);
         return 'false';
     }
 }
+
+
 
   isTestCompleted(): boolean {
     return this.dataStore?.['completed'] || false;
@@ -171,7 +194,7 @@ export class LmsService {
   }
 
   GetValue(element: string): string {
-    return this.dataStore[element] || this.defaultValues[element] || '';
+    return this.dataStore[element] || '';
   }
 
   SetValue(element: string, value: any): string {
@@ -189,7 +212,9 @@ Commit(): string {
 
   // Set cmi.entry to 'resume' before committing dataStore
   this.dataStore['cmi.entry'] = 'resume';
-
+  if (!this.isTestCompleted()) {
+    this.dataStore['cmi.exit'] = 'suspend';
+  }
   console.log("Committing dataStore:", this.dataStore);
   const suspendDataString = JSON.stringify(this.dataStore);
 

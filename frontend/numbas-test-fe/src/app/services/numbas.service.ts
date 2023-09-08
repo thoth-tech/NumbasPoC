@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { catchError, map, retry } from 'rxjs/operators';
 
 @Injectable({
   providedIn: 'root'
@@ -16,6 +16,7 @@ export class NumbasService {
     const resourceMimeType = this.getMimeType(resourcePath);
 
     return this.http.get(resourceUrl, { responseType: 'blob' }).pipe(
+      retry(3),  // Retrying up to 3 times before failing
       map((blob) => new Blob([blob], { type: resourceMimeType })),
       catchError((error: HttpErrorResponse) => {
         console.error('Error fetching Numbas resource:', error);
