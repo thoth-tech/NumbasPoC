@@ -201,7 +201,6 @@ export class LmsService {
     if (element.startsWith('cmi.')) {
       this.dataStore[element] = value;
     }
-    console.log("set value called");
     return 'true';
   }
 //function to save the state of the exam.
