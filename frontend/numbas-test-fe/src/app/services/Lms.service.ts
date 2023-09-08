@@ -11,16 +11,13 @@ export class LmsService {
 
   private apiBaseUrl = 'http://localhost:3000/api/savetest/savetests';
 
-  // private defaultValues: { [key: string]: string } = {
-  //   'cmi.completion_status': 'not attempted',
-  //   'cmi.entry': 'resume',
-  //   'cmi.objectives._count': '0',
-  //   'cmi.interactions._count': '0',
-  //   'numbas.user_role': 'learner',
-  //   'numbas.duration_extension.amount': '0',
-  //   'numbas.duration_extension.units': 'seconds',
-  //   'cmi.mode': 'normal'
-  // };
+  private defaultValues: { [key: string]: string } = {
+    'cmi.completion_status': 'not attempted',
+    'cmi.entry': 'resume',
+    'numbas.user_role': 'learner',
+    'numbas.duration_extension.units': 'seconds',
+    'cmi.mode': 'normal'
+  };
 
   private testId: number = 0;
 
@@ -41,10 +38,7 @@ export class LmsService {
   getDefaultDataStore() {
     // Use spread operator to merge defaultValues into the dataStore
     return {
-      // ...this.defaultValues,
-      testId: null,
-      name: null,
-      attempt_number: 0,
+      ...this.defaultValues,
       pass_status: false,
       completed: false,
     };
@@ -52,7 +46,7 @@ export class LmsService {
 
   Initialize(mode: 'attempt' | 'review' = 'attempt'): string {
     console.log('Initialize() function called');
-
+    const examName = 'test Exam Name 1';
     const studentId = 123456;
     let xhr = new XMLHttpRequest();
     if (mode === 'review') {
@@ -111,6 +105,8 @@ export class LmsService {
             this.dataStore = this.getDefaultDataStore();
             this.SetValue('cmi.entry', 'ab-initio');
             this.SetValue('cmi.learner_id', studentId);
+            this.dataStore['name'] = examName;
+            this.dataStore['attempt_number'] = latestTest.data['attempt_number'];
             console.log(this.dataStore);
       } else if (latestTest.data['cmi_entry'] === 'resume') {
             console.log("resuming test");
@@ -119,26 +115,6 @@ export class LmsService {
             this.dataStore = JSON.parse(JSON.stringify(parsedSuspendData));
 
             console.log(this.dataStore);
-
-
-
-            // Set the suspend_data value as the value for cmi.suspend_data in your datastore
-            //this.SetValue('cmi.suspend_data', latestTest.data.suspend_data || '{}');
-            //this.SetValue('cmi.entry', 'resume');
-            // Setting cmi.location if available in suspend_data
-            // if (parsedSuspendData['cmi.location']) {
-            //   this.SetValue('cmi.location', parsedSuspendData['cmi.location']);
-            // }
-            // this.SetValue('cmi.entry', 'resume');
-            // this.SetValue('cmi.completion_status', 'incomplete');
-            // // Set entire suspendData string to cmi.suspend_data
-            // this.SetValue('cmi.suspend_data', JSON.stringify(parsedSuspendData));
-
-            // // Use SetValue to set parsedSuspendData values to dataStore
-            // Object.keys(parsedSuspendData).forEach(key => {
-            //   this.SetValue(key, parsedSuspendData[key]);
-            // });
-            // console.log(this.dataStore);
         }
 
         this.initializationComplete$.next(true);
@@ -166,9 +142,10 @@ export class LmsService {
     const status = this.GetValue("cmi.completion_status");
     this.dataStore['completed'] = true;
     const currentAttemptNumber = this.dataStore['attempt_number'] || 0;
+    const ExamName = this.dataStore['name'];
 
     const data = {
-      name: 'Test Name',
+      name: ExamName,
       attempt_number: currentAttemptNumber,
       pass_status: status === 'passed',
       suspend_data: JSON.stringify(this.dataStore),
@@ -216,46 +193,31 @@ Commit(): string {
     this.dataStore['cmi.exit'] = 'suspend';
   }
   console.log("Committing dataStore:", this.dataStore);
-  const suspendDataString = JSON.stringify(this.dataStore);
 
-  let jsonData: string;
-  if (typeof suspendDataString === 'string') {
-      try {
-          JSON.parse(suspendDataString);
-          jsonData = suspendDataString;
-      } catch (e) {
-          console.error('Provided string is not valid JSON:', e);
-          return 'false';
+  // Directly stringify the dataStore
+  const jsonData = JSON.stringify(this.dataStore);
+
+  // Use XHR to send the request
+  const xhr = new XMLHttpRequest();
+  xhr.open('PUT', `${this.apiBaseUrl}/${this.testId}/suspend`, true);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+
+  xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 400) {
+          console.log('Suspend data saved successfully.');
+      } else {
+          console.error('Error saving suspend data:', xhr.responseText);
       }
-  } else {
-      try {
-          jsonData = JSON.stringify(suspendDataString);
-      } catch (e) {
-          console.error('Failed to stringify provided data:', e);
-          return 'false';
-      }
-  }
-    // Use XHR to send the request
-    const xhr = new XMLHttpRequest();
-    xhr.open('PUT', `${this.apiBaseUrl}/${this.testId}/suspend`, true);
-    xhr.setRequestHeader('Content-Type', 'application/json');
+  };
 
-    xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 400) {
-            console.log('Suspend data saved successfully.');
-        } else {
-            console.error('Error saving suspend data:', xhr.responseText);
-        }
-    };
+  xhr.onerror = () => {
+      console.error('Request failed.');
+  };
 
-    xhr.onerror = () => {
-        console.error('Request failed.');
-    };
-
-    xhr.send(jsonData);
-
-    return 'true';
+  xhr.send(jsonData);
+  return 'true';
 }
+
   // Placeholder methods for SCORM error handling
   GetLastError(): string {
     //console.log('Get Last Error called');
