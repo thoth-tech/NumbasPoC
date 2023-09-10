@@ -13,10 +13,13 @@ export class LmsService {
 
   private defaultValues: { [key: string]: string } = {
     'cmi.completion_status': 'not attempted',
-    'cmi.entry': 'resume',
+    'cmi.entry': 'ab-initio',
     'numbas.user_role': 'learner',
     'numbas.duration_extension.units': 'seconds',
-    'cmi.mode': 'normal'
+    'cmi.mode': 'normal',
+    'cmi.undefinedlearner_response': '1',
+    'cmi.undefinedresult' : '0'
+    //'cmi.interactions': '0'
   };
 
   private testId: number = 0;
@@ -101,9 +104,9 @@ export class LmsService {
         this.testId = latestTest.data.id;
 
         if (latestTest.data['cmi_entry'] === 'ab-initio') {
-          console.log("starting new test");
-            this.dataStore = this.getDefaultDataStore();
-            this.SetValue('cmi.entry', 'ab-initio');
+            console.log("starting new test");
+            //this.dataStore = this.getDefaultDataStore();
+            //this.SetValue('cmi.entry', 'ab-initio');
             this.SetValue('cmi.learner_id', studentId);
             this.dataStore['name'] = examName;
             this.dataStore['attempt_number'] = latestTest.data['attempt_number'];
@@ -118,6 +121,7 @@ export class LmsService {
         }
 
         this.initializationComplete$.next(true);
+
         console.log("finished initlizing");
         return 'true';
     } catch (error) {
@@ -143,14 +147,16 @@ export class LmsService {
     this.dataStore['completed'] = true;
     const currentAttemptNumber = this.dataStore['attempt_number'] || 0;
     const ExamName = this.dataStore['name'];
-
+    this.SetValue('cmi.entry', 'RO');
+    const cmientry = this.GetValue('cmi.entry');
     const data = {
       name: ExamName,
       attempt_number: currentAttemptNumber,
       pass_status: status === 'passed',
       suspend_data: JSON.stringify(this.dataStore),
       completed: true,
-      exam_result: examResult
+      exam_result: examResult,
+      cmi_entry: cmientry
     };
 
     const xhr = new XMLHttpRequest();
